@@ -1,0 +1,2618 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#EEF3F4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0B1317" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Бортик</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --ground:#EEF3F4;
+  --surface:#FFFFFF;
+  --surface-2:#F6F9F9;
+  --ink:#0E1A1F;
+  --muted:#5C7078;
+  --faint:#8FA3AA;
+  --line:#DCE5E7;
+  --line-strong:#C3D2D5;
+  --accent:#0A7E8C;
+  --accent-ink:#065661;
+  --accent-soft:#DCEFF1;
+  --ochre:#B07E12;
+  --ochre-soft:#F7EBCF;
+  --good:#2A7F62;
+  --bad:#A6402F;
+  --shadow:0 1px 2px rgba(14,26,31,.06), 0 6px 18px rgba(14,26,31,.05);
+  --r:14px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0B1317;
+    --surface:#141F25;
+    --surface-2:#1A272E;
+    --ink:#E7F0F2;
+    --muted:#93A8B0;
+    --faint:#6C838C;
+    --line:#24343B;
+    --line-strong:#33474F;
+    --accent:#3FB3BF;
+    --accent-ink:#8FDDE5;
+    --accent-soft:#12333A;
+    --ochre:#DDAE4B;
+    --ochre-soft:#33290F;
+    --good:#4CB48A;
+    --bad:#D9705C;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 22px rgba(0,0,0,.32);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0B1317;
+  --surface:#141F25;
+  --surface-2:#1A272E;
+  --ink:#E7F0F2;
+  --muted:#93A8B0;
+  --faint:#6C838C;
+  --line:#24343B;
+  --line-strong:#33474F;
+  --accent:#3FB3BF;
+  --accent-ink:#8FDDE5;
+  --accent-soft:#12333A;
+  --ochre:#DDAE4B;
+  --ochre-soft:#33290F;
+  --good:#4CB48A;
+  --bad:#D9705C;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 22px rgba(0,0,0,.32);
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+img{max-width:100%}
+body{
+  margin:0;background:var(--ground);color:var(--ink);
+  font-family:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:16px;line-height:1.45;
+  -webkit-text-size-adjust:100%;
+  -webkit-tap-highlight-color:transparent;
+}
+.mono{font-family:"IBM Plex Mono",ui-monospace,"Consolas",monospace;font-variant-numeric:tabular-nums}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+input,select,textarea{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:10px;padding:10px 12px;width:100%}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent)}
+
+.app{max-width:520px;margin:0 auto;min-height:100vh;padding-bottom:84px;background:var(--ground)}
+
+/* ---------- header ---------- */
+.top{
+  position:sticky;top:0;z-index:20;background:var(--ground);
+  border-bottom:1px solid var(--line);
+  padding:12px 16px 10px;
+}
+.top-row{display:flex;align-items:center;gap:10px}
+.daynav{display:flex;align-items:center;gap:6px;margin-left:auto}
+.iconbtn{
+  width:38px;height:38px;display:grid;place-items:center;border-radius:10px;
+  border:1px solid var(--line-strong);background:var(--surface);color:var(--muted);
+}
+.iconbtn:active{background:var(--surface-2)}
+.date-wrap{position:relative}
+.date-h{
+  font-size:19px;font-weight:800;letter-spacing:-.01em;line-height:1.15;
+  border-bottom:1px dashed var(--line-strong);display:inline-block;padding-bottom:1px;
+}
+#datePick{
+  position:absolute;left:0;top:0;width:100%;height:100%;
+  opacity:0;border:none;padding:0;margin:0;background:none;
+  -webkit-appearance:none;appearance:none;
+}
+.date-sub{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+.today-chip{
+  font-size:12px;font-weight:700;padding:5px 9px;border-radius:999px;
+  background:var(--accent-soft);color:var(--accent-ink);border:none;
+}
+
+/* ---------- состояние синхронизации ---------- */
+.syncbar{
+  position:sticky;top:0;z-index:30;
+  padding:7px 16px;font-size:12.5px;font-weight:700;text-align:center;
+  background:var(--ochre-soft);color:var(--ochre);
+  border-bottom:1px solid var(--ochre);
+}
+.syncbar.wait{background:var(--accent-soft);color:var(--accent-ink);border-bottom-color:var(--accent-soft)}
+
+.syncbox{padding:14px;display:flex;flex-direction:column;gap:11px}
+.syncbox .sline{display:flex;align-items:baseline;justify-content:space-between;gap:12px;font-size:14.5px}
+.syncbox .sline span{color:var(--muted)}
+.syncbox .sline b{font-weight:700;text-align:right}
+.syncbox .sline b.ok{color:var(--good)}
+.syncbox .sline b.warn{color:var(--bad)}
+
+/* ---------- главная ---------- */
+.home{
+  padding:0 0 84px;margin:0 0 -84px;
+  min-height:100vh;
+  background:#8E3247;
+  align-items:center;justify-content:center;gap:0;
+}
+.home-in{display:flex;flex-direction:column;align-items:center;gap:18px;padding:24px}
+.heart{color:#FFD9E0;filter:drop-shadow(0 6px 18px rgba(0,0,0,.22))}
+.home-t{
+  color:#FFF3F5;font-size:34px;font-weight:800;letter-spacing:-.02em;
+  text-align:center;text-wrap:balance;
+}
+@keyframes beat{
+  0%,100%{transform:scale(1)}
+  14%{transform:scale(1.09)}
+  28%{transform:scale(1)}
+  42%{transform:scale(1.06)}
+  56%{transform:scale(1)}
+}
+.heart{animation:beat 2.6s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.heart{animation:none}}
+
+/* ---------- generic ---------- */
+.screen{padding:14px 16px 20px;display:none;flex-direction:column;gap:14px}
+.screen.on{display:flex}
+.sect-label{
+  font-size:11.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--faint);
+}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r)}
+
+/* ---------- banner ---------- */
+.banner{
+  display:flex;gap:10px;align-items:flex-start;
+  background:var(--ochre-soft);border:1px solid var(--ochre);border-radius:12px;
+  padding:11px 13px;font-size:13.5px;line-height:1.4;
+}
+.banner b{display:block;margin-bottom:2px}
+.banner button{
+  margin-top:6px;font-size:13px;font-weight:700;color:var(--ochre);
+  text-decoration:underline;text-underline-offset:3px;padding:0;
+}
+
+/* ---------- session list ---------- */
+.slots{display:flex;flex-direction:column;gap:9px}
+.slot{
+  display:flex;align-items:stretch;gap:0;width:100%;text-align:left;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  overflow:hidden;box-shadow:var(--shadow);
+}
+.slot:active{border-color:var(--line-strong)}
+.slot-bar{width:4px;flex:none;background:var(--line-strong)}
+.slot.done .slot-bar{background:var(--accent)}
+.slot.indiv .slot-bar{background:var(--ochre)}
+.slot.off .slot-bar{background:var(--line)}
+.slot-body{flex:1;padding:12px 14px;min-width:0}
+.slot-time{font-size:20px;font-weight:600;letter-spacing:-.02em}
+.slot-kind{font-size:12.5px;color:var(--muted);font-weight:600;margin-left:8px}
+.slot-line{display:flex;align-items:baseline;gap:0}
+.slot-status{font-size:13.5px;color:var(--muted);margin-top:2px}
+.slot-status.pending{color:var(--faint)}
+.slot-status b{color:var(--ink);font-weight:700}
+.slot-right{display:flex;flex-direction:column;justify-content:center;align-items:flex-end;padding:12px 14px 12px 0;gap:2px;flex:none}
+.slot-count{font-size:22px;font-weight:600;line-height:1}
+.slot-sum{font-size:12px;color:var(--muted);white-space:nowrap}
+.slot.off .slot-time,.slot.off .slot-count{opacity:.45;text-decoration:line-through}
+
+.addbtn{
+  display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  padding:13px;border:1px dashed var(--line-strong);border-radius:var(--r);
+  color:var(--muted);font-weight:600;font-size:14.5px;background:var(--surface-2);
+}
+.addbtn:active{background:var(--surface)}
+
+/* ---------- day total ---------- */
+.daysum{padding:14px;display:flex;flex-direction:column;gap:9px}
+.dsrow{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:14.5px}
+.dsrow span{color:var(--muted)}
+.dsrow b{font-weight:600;font-size:16px}
+.dsrow.tot{border-top:1px solid var(--line);padding-top:9px}
+.dsrow.tot span{color:var(--ink);font-weight:700}
+
+.btnrow{display:flex;gap:9px}
+.btn{
+  flex:1;padding:14px 12px;border-radius:12px;font-weight:700;font-size:15px;
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  background:var(--surface);border:1px solid var(--line-strong);color:var(--ink);
+}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.danger{color:var(--bad);border-color:var(--bad);background:transparent}
+:root[data-theme="dark"] .btn.primary{color:#06222a}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn.primary{color:#06222a}}
+
+/* ---------- money screen ---------- */
+.balance{
+  padding:20px 16px 18px;text-align:center;background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);
+}
+.balance .lab{font-size:13.5px;color:var(--muted);font-weight:600}
+.balance .val{font-size:40px;font-weight:600;letter-spacing:-.03em;line-height:1.1;margin-top:4px}
+.balance.pos .val{color:var(--good)}
+.balance.neg .val{color:var(--bad)}
+.balance .hint{font-size:12.5px;color:var(--faint);margin-top:6px}
+
+.ledger{padding:4px 0}
+.led{
+  display:flex;align-items:center;gap:10px;padding:11px 14px;
+  border-bottom:1px solid var(--line);font-size:14.5px;
+}
+.led:last-child{border-bottom:none}
+.led .sign{width:14px;flex:none;text-align:center;font-weight:700;color:var(--faint)}
+.led .txt{flex:1;min-width:0}
+.led .txt small{display:block;color:var(--faint);font-size:12px;font-weight:500}
+.led .amt{font-weight:600;white-space:nowrap}
+.led.plus .sign{color:var(--good)}
+.led.minus .sign{color:var(--bad)}
+.led.flat .sign{color:var(--faint)}
+.led.flat .amt{color:var(--muted)}
+
+.split{padding:4px 0}
+.split-row{display:flex;align-items:center;gap:11px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.split-row:last-child{border-bottom:none}
+.split-row .st{flex:1;min-width:0}
+.split-row .st b{font-size:14.5px;font-weight:700;display:block}
+.split-row .st small{display:block;color:var(--faint);font-size:12px;margin-top:1px}
+.split-row .sv{font-size:17px;font-weight:600;white-space:nowrap}
+.split-row.ok .sv{color:var(--good)}
+.split-row.owe .sv{color:var(--bad)}
+.split-row.total{border-top:2px solid var(--line-strong);border-bottom:none}
+.split-row.total .st b{font-size:16px}
+.split-row.total .sv{font-size:20px}
+
+.movelist{display:flex;flex-direction:column}
+.move{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--line);font-size:14.5px}
+.move:last-child{border-bottom:none}
+.move .m-t{flex:1;min-width:0;padding:2px 0}
+.move .m-t small{display:block;color:var(--faint);font-size:12px}
+.move .m-a{font-weight:600;white-space:nowrap}
+.move .m-act{
+  width:44px;height:44px;flex:none;display:grid;place-items:center;
+  border-radius:10px;color:var(--muted);font-size:18px;
+  border:1px solid var(--line);background:var(--surface-2);
+}
+.move .m-act:active{background:var(--accent-soft);color:var(--accent-ink)}
+.empty{padding:18px 14px;color:var(--faint);font-size:14px;text-align:center}
+
+/* ---------- kids screen ---------- */
+.kidrow{
+  display:flex;align-items:center;gap:11px;padding:0 12px 0 14px;min-height:56px;
+  border-bottom:1px solid var(--line);
+}
+.kidrow:last-child{border-bottom:none}
+.kidrow .nm{flex:1;min-width:0;font-size:16px;font-weight:600;overflow-wrap:anywhere}
+.kidrow.arch .nm{color:var(--faint);text-decoration:line-through}
+.tag{
+  font-size:12px;font-weight:700;padding:4px 8px;border-radius:7px;
+  background:var(--accent-soft);color:var(--accent-ink);white-space:nowrap;
+}
+.kid-act{width:40px;height:40px;display:grid;place-items:center;color:var(--faint);border-radius:9px;flex:none}
+
+/* ---------- attendance overlay ---------- */
+.sheet{
+  position:fixed;inset:0;z-index:60;background:var(--ground);
+  display:none;flex-direction:column;
+}
+.sheet.on{display:flex}
+.sheet-top{
+  flex:none;background:var(--surface);border-bottom:1px solid var(--line);
+  padding:11px 12px;display:flex;align-items:center;gap:10px;
+}
+.sheet-title{flex:1;min-width:0}
+.sheet-title .t1{font-size:18px;font-weight:800;letter-spacing:-.01em}
+.sheet-title .t2{font-size:12.5px;color:var(--muted);font-weight:600}
+.sheet-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.sheet-inner{max-width:520px;margin:0 auto;padding:12px 14px 24px;display:flex;flex-direction:column;gap:12px}
+.sheet-foot{
+  flex:none;background:var(--surface);border-top:1px solid var(--line);
+  padding:11px 14px calc(11px + env(safe-area-inset-bottom));
+}
+.sheet-foot .inner{max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+
+.att{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.att-item{display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--line);min-height:58px;padding-right:6px}
+.att-item:last-child{border-bottom:none}
+.att-hit{flex:1;display:flex;align-items:center;gap:12px;padding:10px 0 10px 13px;min-width:0;text-align:left;min-height:58px}
+.box{
+  width:26px;height:26px;flex:none;border-radius:8px;border:2px solid var(--line-strong);
+  display:grid;place-items:center;color:transparent;font-size:15px;font-weight:800;
+}
+.att-item.here .box{background:var(--accent);border-color:var(--accent);color:#fff}
+:root[data-theme="dark"] .att-item.here .box{color:#06222a}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .att-item.here .box{color:#06222a}}
+.att-name{font-size:16.5px;font-weight:600;overflow-wrap:anywhere}
+.att-item.here .att-name{font-weight:700}
+.att-item:not(.here) .att-name{color:var(--muted)}
+.paybtn{
+  flex:none;min-width:44px;height:44px;padding:0 10px;border-radius:10px;
+  display:grid;place-items:center;color:var(--faint);font-size:17px;font-weight:700;
+}
+.paybtn.paid{background:var(--ochre-soft);color:var(--ochre);font-size:13px;font-weight:700}
+.paybtn.qr{background:var(--accent-soft);color:var(--accent-ink);font-size:13px;font-weight:700}
+
+.grprow{
+  display:flex;align-items:center;gap:11px;padding:11px 10px 11px 14px;
+  border-bottom:1px solid var(--line);min-height:62px;
+}
+.grprow:last-child{border-bottom:none}
+.grprow .gt{font-size:19px;font-weight:600;min-width:58px;letter-spacing:-.01em}
+.grprow .gmid{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.grprow .gk{font-size:12.5px;color:var(--muted)}
+.grprow.orphan .gt{color:var(--bad)}
+
+.dayset{display:flex;gap:4px;flex-wrap:wrap}
+.dayset span{
+  min-width:25px;height:23px;padding:0 4px;border-radius:7px;
+  display:grid;place-items:center;font-size:11px;font-weight:700;
+  background:var(--surface-2);color:var(--faint);border:1px solid var(--line);
+}
+.dayset span.on{background:var(--accent-soft);color:var(--accent-ink);border-color:var(--accent-soft)}
+
+.timepick{display:flex;flex-wrap:wrap;gap:6px}
+.timepick button{
+  padding:11px 13px;border-radius:10px;border:1px solid var(--line-strong);
+  background:var(--surface-2);font-weight:600;font-size:15px;color:var(--muted);
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums;
+}
+.timepick button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+:root[data-theme="dark"] .timepick button.on{color:#06222a}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .timepick button.on{color:#06222a}}
+.addrow{display:flex;gap:8px}
+.addrow input{flex:1;min-width:0}
+.addrow button{flex:none;width:52px;border-radius:10px;border:1px solid var(--line-strong);background:var(--surface-2);font-size:20px;font-weight:700;color:var(--muted)}
+
+.tags{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:60%}
+
+.daterange{display:flex;align-items:center;gap:8px}
+.daterange input{flex:1;min-width:0}
+.daterange span{color:var(--faint);font-weight:700}
+
+.daypick{display:flex;gap:5px}
+.daypick button{
+  flex:1;height:46px;border-radius:10px;border:1px solid var(--line-strong);
+  background:var(--surface-2);font-weight:700;font-size:13px;color:var(--muted);padding:0;
+}
+.daypick button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+:root[data-theme="dark"] .daypick button.on{color:#06222a}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .daypick button.on{color:#06222a}}
+
+.wk{display:flex;flex-direction:column}
+.wk-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:14.5px}
+.wk-row:last-child{border-bottom:none}
+.wk-row .wd{width:34px;font-weight:700;color:var(--muted);text-transform:uppercase;font-size:12.5px}
+.wk-row .wt{flex:1;font-weight:600}
+.wk-row.free .wt{color:var(--faint);font-weight:500}
+.wk-row .wn{font-size:12.5px;color:var(--faint);white-space:nowrap}
+
+.hint-lab{
+  font-size:12.5px;font-weight:700;color:var(--ochre);
+  margin-bottom:6px;letter-spacing:.01em;
+}
+.pick{max-height:46vh;overflow-y:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface-2)}
+.pick button{
+  display:flex;width:100%;align-items:center;gap:10px;padding:11px 13px;
+  border-bottom:1px solid var(--line);text-align:left;min-height:54px;
+}
+.pick button:last-child{border-bottom:none}
+.pick button:active{background:var(--accent-soft)}
+.pick .pn{flex:1;min-width:0;font-size:16px;font-weight:600;overflow-wrap:anywhere}
+
+.tot-strip{display:flex;gap:10px}
+.tot-box{flex:1;background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:9px 11px}
+.tot-box .k{font-size:11.5px;color:var(--muted);font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+.tot-box .v{font-size:19px;font-weight:600;margin-top:1px}
+
+/* ---------- admin view ---------- */
+.adm{padding:18px 18px 26px;max-width:520px;margin:0 auto}
+.adm-h{font-size:15px;color:var(--muted);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.adm-time{font-size:34px;font-weight:600;letter-spacing:-.02em;margin:2px 0 14px}
+.adm-list{display:flex;flex-direction:column;gap:0;border-top:2px solid var(--ink)}
+.adm-list li{
+  list-style:none;display:flex;gap:14px;align-items:baseline;
+  padding:11px 2px;border-bottom:1px solid var(--line);font-size:22px;font-weight:600;
+}
+.adm-list li .n{color:var(--faint);font-size:16px;min-width:24px}
+.adm-tot{margin-top:18px;display:flex;gap:12px}
+.adm-tot div{flex:1;border:2px solid var(--ink);border-radius:12px;padding:12px 14px}
+.adm-tot .k{font-size:12.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.adm-tot .v{font-size:30px;font-weight:600;letter-spacing:-.02em}
+
+/* ---------- modal ---------- */
+.modal{position:fixed;inset:0;z-index:80;display:none;align-items:flex-end;justify-content:center;background:rgba(8,18,22,.5)}
+.modal.on{display:flex}
+.modal-card{
+  width:100%;max-width:520px;background:var(--surface);
+  border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));
+  max-height:88vh;overflow-y:auto;display:flex;flex-direction:column;gap:13px;
+}
+.modal-h{font-size:18px;font-weight:800;letter-spacing:-.01em}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-size:12.5px;font-weight:700;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.seg{display:flex;gap:6px}
+.seg button{
+  flex:1;padding:11px 8px;border-radius:10px;border:1px solid var(--line-strong);
+  background:var(--surface-2);font-weight:700;font-size:14px;color:var(--muted);
+}
+.seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+:root[data-theme="dark"] .seg button.on{color:#06222a}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .seg button.on{color:#06222a}}
+.copybox{
+  width:100%;min-height:190px;font-family:"IBM Plex Mono",monospace;font-size:12.5px;
+  line-height:1.5;background:var(--surface-2);white-space:pre;overflow:auto;
+}
+.note{font-size:12.5px;color:var(--faint);line-height:1.45}
+
+/* ---------- settings ---------- */
+.setgrid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.schedule-day{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.schedule-day:last-child{border-bottom:none}
+.schedule-day .dn{width:34px;font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase}
+.schedule-day input{flex:1}
+
+/* ---------- bottom nav ---------- */
+.nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:40;
+  background:var(--surface);border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.nav-inner{max-width:520px;margin:0 auto;display:flex}
+.nav button{
+  flex:1;min-width:0;padding:8px 1px 9px;display:flex;flex-direction:column;
+  align-items:center;gap:2px;white-space:nowrap;
+  color:var(--faint);font-size:9.5px;font-weight:700;letter-spacing:0;
+}
+.nav button.on{color:var(--accent)}
+.nav .dot{font-size:17px;line-height:1}
+.nav .badge{
+  font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:600;
+}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="syncbar" id="syncBar" hidden></div>
+  <div class="top" id="topBar">
+    <div class="top-row">
+      <div class="date-wrap">
+        <div class="date-sub" id="dSub">—</div>
+        <div class="date-h" id="dMain">—</div>
+        <input type="date" id="datePick" aria-label="Выбрать дату">
+      </div>
+      <div class="daynav">
+        <button class="today-chip" id="btnToday" type="button">Сегодня</button>
+        <button class="iconbtn" id="btnPrev" type="button" aria-label="Предыдущий день">‹</button>
+        <button class="iconbtn" id="btnNext" type="button" aria-label="Следующий день">›</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== ГЛАВНАЯ ===== -->
+  <section class="screen on home" id="scHome">
+    <div class="home-in">
+      <svg class="heart" viewBox="0 0 24 24" width="104" height="104" fill="currentColor" aria-hidden="true">
+        <path d="M12 21.2C12 21.2 3.6 15.9 3.6 9.9c0-2.7 2.1-4.7 4.6-4.7 1.6 0 3 .8 3.8 2.1.8-1.3 2.2-2.1 3.8-2.1 2.5 0 4.6 2 4.6 4.7 0 6-8.4 11.3-8.4 11.3z"/>
+      </svg>
+      <div class="home-t">Люблю тебя</div>
+    </div>
+  </section>
+
+  <!-- ===== СЕГОДНЯ ===== -->
+  <section class="screen" id="scDay">
+    <div id="demoBanner"></div>
+    <div class="slots" id="slots"></div>
+    <button class="addbtn" id="btnAddSession" type="button">+ Добавить тренировку</button>
+
+    <div class="sect-label">Итог дня</div>
+    <div class="card daysum" id="dayTotals"></div>
+
+    <div class="btnrow">
+      <button class="btn primary" id="btnDayReport" type="button">Отчёт за день</button>
+    </div>
+  </section>
+
+  <!-- ===== ДЕНЬГИ ===== -->
+  <section class="screen" id="scMoney">
+    <div class="balance" id="balBox">
+      <div class="lab" id="balLab">—</div>
+      <div class="val mono" id="balVal">—</div>
+      <div class="hint" id="balHint"></div>
+    </div>
+
+    <div class="sect-label">Из чего сложилось</div>
+    <div class="card ledger" id="ledger"></div>
+
+    <div class="btnrow">
+      <button class="btn" id="btnAddMoney" type="button">+ Движение денег</button>
+    </div>
+    <div class="btnrow">
+      <button class="btn" id="btnWeek" type="button">Отчёт за неделю</button>
+      <button class="btn" id="btnMonth" type="button">За месяц</button>
+    </div>
+
+    <div class="sect-label">Из чего сложился долг</div>
+    <div class="card split" id="splitBox"></div>
+
+    <div class="sect-label">Полученное от начальника</div>
+    <div class="card movelist" id="moves"></div>
+  </section>
+
+  <!-- ===== НЕДЕЛЯ ===== -->
+  <section class="screen" id="scWeek">
+    <div class="btnrow">
+      <button class="btn primary" id="btnAddGroup" type="button">+ Новая группа</button>
+    </div>
+    <div class="sect-label">Постоянные группы</div>
+    <div class="card" id="groupList"></div>
+    <div class="sect-label">Как выглядит неделя</div>
+    <div class="card wk" id="weekOverview"></div>
+    <div class="note">Индивидуальные сюда не входят: они двигаются, их добавляют на нужный день кнопкой «Добавить тренировку».</div>
+  </section>
+
+  <!-- ===== ДЕТИ ===== -->
+  <section class="screen" id="scKids">
+    <div class="btnrow">
+      <button class="btn primary" id="btnAddKid" type="button">+ Добавить ребёнка</button>
+      <button class="btn" id="btnImport" type="button">Импорт списка</button>
+    </div>
+    <div class="sect-label" id="kidsLabel">Все дети</div>
+    <div class="card" id="kidsList"></div>
+
+  </section>
+
+  <!-- ===== НАСТРОЙКИ ===== -->
+  <section class="screen" id="scSet">
+    <div class="sect-label">Отчёты</div>
+    <div class="card" style="padding:14px">
+      <div class="field">
+        <label for="sBoss">Имя начальника</label>
+        <input id="sBoss" type="text" autocomplete="off" placeholder="Коля">
+      </div>
+      <div class="note" style="margin-top:8px">Подставляется в начало отчёта: «Коля, сегодня 8 сентября...». Оставьте пустым — обращения не будет.</div>
+    </div>
+
+    <div class="sect-label">Оформление</div>
+    <div class="card" style="padding:14px">
+      <div class="field">
+        <label>Тема</label>
+        <div class="seg" id="themeSeg">
+          <button type="button" data-t="auto">Как в телефоне</button>
+          <button type="button" data-t="light">Светлая</button>
+          <button type="button" data-t="dark">Тёмная</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="sect-label">Ваша ставка за тренировку</div>
+    <div class="card" style="padding:14px">
+      <div class="setgrid">
+        <div class="field">
+          <label for="sFeeGroup">За группу</label>
+          <input class="mono" id="sFeeGroup" type="number" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label for="sFeeIndiv">За индивидуальную</label>
+          <input class="mono" id="sFeeIndiv" type="number" inputmode="numeric">
+        </div>
+      </div>
+    </div>
+
+    <div class="sect-label">Сколько уходит бассейну</div>
+    <div class="card" style="padding:14px">
+      <div class="setgrid">
+        <div class="field">
+          <label for="sPoolChild">За ребёнка в группе</label>
+          <input class="mono" id="sPoolChild" type="number" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label for="sPoolIndiv">За индивидуальную</label>
+          <input class="mono" id="sPoolIndiv" type="number" inputmode="numeric">
+        </div>
+      </div>
+    </div>
+
+    <div class="sect-label">Цены для родителей</div>
+    <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:11px">
+      <div class="note">Подставляются кнопкой, когда записываете принятую оплату. Оставьте 0, если цена ещё не известна.</div>
+      <div class="setgrid">
+        <div class="field">
+          <label for="sPriceSub">Абонемент</label>
+          <input class="mono" id="sPriceSub" type="number" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label for="sPriceIndiv">Индивидуальная</label>
+          <input class="mono" id="sPriceIndiv" type="number" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label for="sPriceTrial">Пробное занятие</label>
+          <input class="mono" id="sPriceTrial" type="number" inputmode="numeric">
+        </div>
+      </div>
+    </div>
+
+    <div class="sect-label">Синхронизация</div>
+    <div class="card syncbox" id="syncBox"></div>
+
+    <div class="sect-label">Данные</div>
+    <div class="btnrow">
+      <button class="btn" id="btnBackup" type="button">Бэкап</button>
+      <button class="btn" id="btnRestore" type="button">Восстановить</button>
+    </div>
+    <div class="note">Всё хранится только в этом браузере. Раз в неделю жмите «Бэкап» и отправляйте текст себе в избранное — если телефон потеряется, данные восстановятся.</div>
+  </section>
+
+  <div class="nav">
+    <div class="nav-inner">
+      <button class="on" data-scr="scHome" type="button"><span class="dot">♥</span>Тебе</button>
+      <button data-scr="scDay" type="button"><span class="dot">◷</span>День</button>
+      <button data-scr="scWeek" type="button"><span class="dot">▦</span>Неделя</button>
+      <button data-scr="scMoney" type="button"><span class="dot">₽</span><span class="badge" id="navBal">—</span></button>
+      <button data-scr="scKids" type="button"><span class="dot">☰</span>Дети</button>
+      <button data-scr="scSet" type="button"><span class="dot">⚙</span>Настройки</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ЛИСТ ПОСЕЩАЕМОСТИ ===== -->
+<div class="sheet" id="attSheet">
+  <div class="sheet-top">
+    <button class="iconbtn" id="attClose" type="button" aria-label="Назад">‹</button>
+    <div class="sheet-title">
+      <div class="t1 mono" id="attTime">—</div>
+      <div class="t2" id="attKind">—</div>
+    </div>
+    <button class="iconbtn" id="attMenu" type="button" aria-label="Действия">⋯</button>
+  </div>
+  <div class="sheet-body">
+    <div class="sheet-inner">
+      <div class="att" id="attList"></div>
+      <div class="btnrow">
+        <button class="btn" id="attAddKid" type="button">+ Новенький</button>
+        <button class="btn" id="attGuest" type="button">+ Из другой группы</button>
+      </div>
+    </div>
+  </div>
+  <div class="sheet-foot">
+    <div class="inner">
+      <div class="tot-strip">
+        <div class="tot-box"><div class="k">Пришло</div><div class="v mono" id="attCount">0</div></div>
+        <div class="tot-box"><div class="k">Бассейну</div><div class="v mono" id="attPool">0 ₽</div></div>
+      </div>
+      <div class="btnrow">
+        <button class="btn primary" id="attAdmin" type="button">Показать админу</button>
+        <button class="btn" id="attCopy" type="button">Скопировать</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ЭКРАН ДЛЯ АДМИНА ===== -->
+<div class="sheet" id="admSheet">
+  <div class="sheet-top">
+    <button class="iconbtn" id="admClose" type="button" aria-label="Назад">‹</button>
+    <div class="sheet-title"><div class="t1">Для администратора</div></div>
+  </div>
+  <div class="sheet-body"><div class="adm" id="admBody"></div></div>
+</div>
+
+<!-- ===== МОДАЛКА ===== -->
+<div class="modal" id="modal">
+  <div class="modal-card" id="modalCard"></div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ------------------------------------------------------------------
+   Подключение к серверу. Заполняется один раз после создания проекта
+   в Supabase: Project Settings → API. Оба значения публичные по замыслу
+   сервиса — доступ к данным закрывает секрет из ссылки, а не они.
+   Пока строки пустые, приложение работает только на этом устройстве.
+------------------------------------------------------------------- */
+var SUPABASE_URL = "https://thhuxdlaicyufqrdksbt.supabase.co";
+var SUPABASE_KEY = "sb_publishable_5a2cQfZ6Nchd3_n1g8-pGw_JrcaiUqg";
+
+var KEY = "bortik.v1";
+var SPACE_KEY = "bortik.space";
+var DAYS = ["воскресенье","понедельник","вторник","среда","четверг","пятница","суббота"];
+var DAYS_SHORT = ["вс","пн","вт","ср","чт","пт","сб"];
+var MONTHS = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
+
+/* ---------- state ---------- */
+var S = null;
+var view = { date: iso(new Date()), screen: "scHome", openKey: null };
+
+function iso(d){
+  return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate());
+}
+function pad(n){ return n < 10 ? "0"+n : ""+n; }
+function parseIso(s){
+  var p = s.split("-");
+  return new Date(+p[0], +p[1]-1, +p[2]);
+}
+function shiftDate(s, delta){
+  var d = parseIso(s); d.setDate(d.getDate()+delta); return iso(d);
+}
+function money(n){
+  var neg = n < 0; n = Math.round(Math.abs(n));
+  var s = String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return (neg ? "−" : "") + s + " ₽";
+}
+function uid(){ return Math.random().toString(36).slice(2,9); }
+
+function defaults(){
+  return {
+    v: 1,
+    demo: true,
+    settings: { feeGroup:1000, feeIndiv:500, poolChild:400, poolIndiv:900,
+                priceSub:0, priceIndiv:1800, priceTrial:0, theme:"auto", bossName:"" },
+    schedule: { 0:["10:00","11:00"], 1:[], 2:["17:00","18:00","19:00"], 3:["18:00"],
+                4:["17:00","18:00","19:00"], 5:[], 6:["10:00","11:00"] },
+    kids: [],
+    sessions: {},
+    money: []
+  };
+}
+
+function seedDemo(st){
+  var names17 = [["Абрамов","Матвей"],["Белова","Соня"],["Гущин","Тимур"],["Дорохова","Ева"],
+                 ["Ерёмин","Лев"],["Жукова","Милана"],["Зимин","Артём"],["Ильина","Варя"],["Ковалёв","Марк"]];
+  var names18 = [["Лапина","Кира"],["Мельников","Егор"],["Новикова","Аня"],["Орлов","Демид"],
+                 ["Рогова","Злата"],["Седов","Илья"]];
+  var i;
+  var today = st.schedule[new Date().getDay()] || [];
+  var slotA = today[0] || "17:00";
+  var slotB = today[1] || (slotA === "18:00" ? "19:00" : "18:00");
+  for(i=0;i<names17.length;i++) st.kids.push({id:uid(), name:names17[i][0], first:names17[i][1], slots:[slotA], arch:false});
+  for(i=0;i<names18.length;i++) st.kids.push({id:uid(), name:names18[i][0], first:names18[i][1], slots:[slotB], arch:false});
+  // Соня ходит в оба времени — показываем, что так можно
+  if(slotA !== slotB) st.kids[1].slots = [slotA, slotB].sort();
+
+  var dateToday = iso(new Date());
+  var k = dateToday + "|" + slotA;
+  st.sessions[k] = {
+    date: dateToday, time: slotA, type: "group",
+    present: st.kids.slice(0,7).map(function(x){return x.id;}),
+    pay: [{ kidId: st.kids[1].id, amount: 4800, kind: "sub", way: "cash" }],
+    off: false
+  };
+  st.money.push({ id:uid(), date: shiftDate(dateToday,-2), kind:"payout", amount:12000, salary:2000, note:"перевод на карту" });
+  return st;
+}
+
+function load(){
+  var raw = null;
+  try { raw = localStorage.getItem(KEY); } catch(e){}
+  if(raw){
+    try {
+      var p = JSON.parse(raw);
+      if(p && p.settings && p.kids && p.sessions) return migrate(p);
+    } catch(e){}
+  }
+  return seedDemo(defaults());
+}
+function save(fromServer){
+  if(!fromServer) S.updatedAt = new Date().toISOString();
+  try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){}
+  if(!fromServer) schedulePush();
+}
+
+/* ---------- синхронизация ---------- */
+var sync = { space:null, on:false, state:"idle", detail:"", timer:null, pushedAt:null, lastOk:null };
+
+function spaceFromUrl(){
+  var m = (location.hash || "").match(/[#&]k=([A-Za-z0-9_-]{24,})/);
+  if(m){
+    try { localStorage.setItem(SPACE_KEY, m[1]); } catch(e){}
+    // убираем секрет из адресной строки, чтобы не светился на экране
+    try { history.replaceState(null, "", location.pathname + location.search); } catch(e){}
+    return m[1];
+  }
+  try { return localStorage.getItem(SPACE_KEY); } catch(e){ return null; }
+}
+
+function rpc(fn, body){
+  return fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SUPABASE_KEY,
+      "Authorization": "Bearer " + SUPABASE_KEY
+    },
+    body: JSON.stringify(body)
+  }).then(function(r){
+    if(!r.ok) return r.text().then(function(t){ throw new Error(t || ("HTTP " + r.status)); });
+    return r.json();
+  });
+}
+
+function setSync(state, detail){
+  sync.state = state;
+  sync.detail = detail || "";
+  if(state === "saved") sync.lastOk = new Date();
+  renderSyncBar();
+  if(el("scSet").classList.contains("on")) renderSyncBox();
+}
+
+function schedulePush(){
+  if(!sync.on) return;
+  setSync("pending");
+  clearTimeout(sync.timer);
+  sync.timer = setTimeout(pushNow, 2000);
+}
+
+function pushNow(){
+  if(!sync.on) return Promise.resolve();
+  if(sync.pushedAt === S.updatedAt){ setSync("saved"); return Promise.resolve(); }
+  if(navigator.onLine === false){ setSync("offline"); return Promise.resolve(); }
+  setSync("saving");
+  var at = S.updatedAt;
+  return rpc("save_space", { k: sync.space, d: S }).then(function(){
+    sync.pushedAt = at;
+    if(at === S.updatedAt) setSync("saved");
+    else schedulePush();
+  }).catch(function(e){
+    setSync("error", String(e && e.message || e).slice(0, 120));
+  });
+}
+
+function pullNow(){
+  if(!sync.on) return Promise.resolve("off");
+  return rpc("load_space", { k: sync.space }).then(function(rows){
+    var row = rows && rows[0];
+    if(!row || !row.data || !row.data.settings) return "empty";
+    var remote = row.data;
+    var localAt = S.updatedAt || "";
+    var remoteAt = remote.updatedAt || "";
+    if(remoteAt > localAt){
+      S = migrate(remote);
+      if(!S.settings.theme) S.settings.theme = "auto";
+      sync.pushedAt = remoteAt;
+      save(true);
+      applyTheme(); renderAll();
+      setSync("saved");
+      return "pulled";
+    }
+    return "kept";
+  });
+}
+
+function initSync(){
+  renderSyncBar();
+  if(!SUPABASE_URL || !SUPABASE_KEY) return;
+  sync.space = spaceFromUrl();
+  if(!sync.space) return;
+  sync.on = true;
+  setSync("saving");
+
+  pullNow().then(function(res){
+    if(res === "empty") return pushNow();
+    if(res === "kept" && S.updatedAt) return pushNow();
+    setSync("saved");
+  }).catch(function(e){
+    setSync("error", String(e && e.message || e).slice(0, 120));
+  });
+
+  window.addEventListener("online", function(){ pushNow(); });
+  window.addEventListener("offline", function(){ setSync("offline"); });
+  document.addEventListener("visibilitychange", function(){
+    if(document.hidden) return;
+    pullNow().then(function(){ return pushNow(); }).catch(function(){});
+  });
+}
+
+function renderSyncBar(){
+  var bar = el("syncBar");
+  if(!sync.on || sync.state === "saved" || sync.state === "idle"){ bar.hidden = true; return; }
+  var txt = "", cls = "";
+  if(sync.state === "saving"){ txt = "Сохраняю на сервер…"; cls = "wait"; }
+  else if(sync.state === "pending"){ txt = "Ещё не на сервере"; cls = "wait"; }
+  else if(sync.state === "offline"){ txt = "Нет сети — всё записано в телефон"; }
+  else if(sync.state === "error"){ txt = "Сервер не отвечает — всё записано в телефон"; }
+  bar.textContent = txt;
+  bar.className = "syncbar " + cls;
+  bar.hidden = false;
+}
+
+function renderSyncBox(){
+  var box = el("syncBox");
+  if(!SUPABASE_URL || !SUPABASE_KEY){
+    box.innerHTML = '<div class="note">Сервер не подключён: данные живут только в этом браузере. Делайте бэкап раз в неделю.</div>';
+    return;
+  }
+  if(!sync.on){
+    box.innerHTML = '<div class="note">Нет ключа доступа. Откройте приложение по своей ссылке — она заканчивается на #k=…</div>';
+    return;
+  }
+  var st = sync.state === "saved" ? ["Всё на сервере", "ok"]
+         : sync.state === "saving" ? ["Отправляю…", ""]
+         : sync.state === "pending" ? ["Ждёт отправки", "warn"]
+         : sync.state === "offline" ? ["Нет сети", "warn"]
+         : sync.state === "error" ? ["Ошибка сервера", "warn"]
+         : ["—", ""];
+  box.innerHTML =
+    '<div class="sline"><span>Состояние</span><b class="' + st[1] + '">' + st[0] + '</b></div>' +
+    '<div class="sline"><span>Последняя отправка</span><b>' +
+      (sync.lastOk ? sync.lastOk.getHours() + ":" + pad(sync.lastOk.getMinutes()) : "не было") + '</b></div>' +
+    (sync.detail ? '<div class="note">' + escapeHtml(sync.detail) + '</div>' : '') +
+    '<div class="btnrow">' +
+      '<button class="btn" id="syncNow" type="button">Синхронизировать</button>' +
+      '<button class="btn" id="syncLink" type="button">Ссылка</button>' +
+    '</div>';
+  el("syncNow").onclick = function(){
+    pullNow().then(function(){ return pushNow(); }).catch(function(e){
+      setSync("error", String(e && e.message || e).slice(0, 120));
+    });
+  };
+  el("syncLink").onclick = function(){
+    copyModal("Ссылка для второго устройства",
+      location.origin + location.pathname + "#k=" + sync.space,
+      "Кто откроет эту ссылку, тот увидит все данные. Не отправляйте её в общие чаты.");
+  };
+}
+
+/* ---------- session helpers ---------- */
+function keyOf(date, time){ return date + "|" + time; }
+
+function sessionsForDate(date){
+  var d = parseIso(date).getDay();
+  var planned = (S.schedule[d] || []).slice();
+  var out = [];
+  var seen = {};
+  var i, t, k;
+  for(i=0;i<planned.length;i++){
+    t = planned[i]; k = keyOf(date,t); seen[t] = true;
+    out.push(S.sessions[k] || { date:date, time:t, type:"group", present:[], pay:[], off:false, ghost:true });
+  }
+  for(k in S.sessions){
+    if(!S.sessions.hasOwnProperty(k)) continue;
+    var s = S.sessions[k];
+    if(s.date === date && !seen[s.time]) out.push(s);
+  }
+  out.sort(function(a,b){ return a.time < b.time ? -1 : a.time > b.time ? 1 : 0; });
+  return out;
+}
+
+function realSession(date, time){
+  var k = keyOf(date,time);
+  if(!S.sessions[k]){
+    var d = parseIso(date).getDay();
+    var planned = S.schedule[d] || [];
+    var isPlanned = planned.indexOf(time) >= 0;
+    S.sessions[k] = { date:date, time:time, type: isPlanned ? "group" : "indiv", present:[], pay:[], off:false };
+  }
+  return S.sessions[k];
+}
+
+function poolOf(s){
+  if(s.off || !s.present.length) return 0;
+  return s.type === "group" ? S.settings.poolChild * s.present.length : S.settings.poolIndiv;
+}
+function feeOf(s){
+  if(s.off || !s.present.length) return 0;
+  return s.type === "group" ? S.settings.feeGroup : S.settings.feeIndiv;
+}
+var PAY_WAYS = { cash: "наличными мне", qr: "по QR начальнику" };
+
+function payOf(s, way){
+  var t = 0;
+  (s.pay || []).forEach(function(p){
+    if(!way || (p.way || "cash") === way) t += p.amount;
+  });
+  return t;
+}
+function kidById(id){
+  for(var i=0;i<S.kids.length;i++) if(S.kids[i].id === id) return S.kids[i];
+  return null;
+}
+function fullName(k){
+  if(!k) return "—";
+  return (k.name || "") + (k.first ? " " + k.first : "");
+}
+function kidName(id){ return fullName(kidById(id)); }
+
+/* Ребёнок может ходить в разные часы: во вторник на 18:00, в субботу на 12:00.
+   Раньше время было одно — старые записи подхватываем как список из одного. */
+function slotsOf(k){
+  if(!k) return [];
+  if(Array.isArray(k.slots)) return k.slots;
+  return k.slot ? [k.slot] : [];
+}
+function hasSlot(k, t){ return slotsOf(k).indexOf(t) >= 0; }
+
+function migrate(st){
+  (st.kids || []).forEach(function(k){
+    if(!Array.isArray(k.slots)) k.slots = k.slot ? [k.slot] : [];
+    if("slot" in k) delete k.slot;
+  });
+  return st;
+}
+
+function allSessions(){
+  var out = [], k;
+  for(k in S.sessions){ if(S.sessions.hasOwnProperty(k)) out.push(S.sessions[k]); }
+  return out;
+}
+
+/* ---------- переводы от начальника ---------- */
+function splitOf(m){
+  if(m.kind === "payout"){
+    var sal = Math.min(m.salary || 0, m.amount);
+    return { salary: sal, bank: m.amount - sal };
+  }
+  if(m.kind === "salary") return { salary: m.amount, bank: 0 };
+  if(m.kind === "advance") return { salary: 0, bank: m.amount };
+  return { salary: 0, bank: 0 };
+}
+function lastPayoutBefore(date, exceptId){
+  var best = null;
+  S.money.forEach(function(m){
+    if(m.kind === "adjust" || m.date >= date) return;
+    if(exceptId && m.id === exceptId) return;
+    if(!best || m.date > best.date) best = m;
+  });
+  return best;
+}
+/* последняя выдача, которая закрывала зарплату (записи чисто на бассейн её не двигают) */
+function lastSalaryBefore(date, exceptId){
+  var best = null;
+  S.money.forEach(function(m){
+    if(m.kind === "adjust" || m.date >= date) return;
+    if(exceptId && m.id === exceptId) return;
+    if(splitOf(m).salary <= 0) return;
+    if(!best || m.date > best.date) best = m;
+  });
+  return best;
+}
+/* с какого дня считать зарплату в следующий раз */
+function nextPeriodStart(to, exceptId){
+  var prev = lastSalaryBefore(to, exceptId);
+  if(!prev) return firstSessionDate() || to;
+  return shiftDate(prev.salTo || prev.date, 1);
+}
+function firstSessionDate(){
+  var d = null;
+  allSessions().forEach(function(s){
+    if(s.off || !s.present.length) return;
+    if(!d || s.date < d) d = s.date;
+  });
+  return d;
+}
+function feesBetween(from, to){
+  var t = 0, g = 0, ind = 0;
+  allSessions().forEach(function(s){
+    if(s.off || !s.present.length) return;
+    if(s.date < from || s.date > to) return;
+    t += feeOf(s);
+    if(s.type === "group") g++; else ind++;
+  });
+  return { total: t, g: g, ind: ind };
+}
+
+/* ---------- balance ---------- */
+function balance(){
+  var all = allSessions();
+  var fees = 0, pool = 0, cash = 0, i;
+  for(i=0;i<all.length;i++){
+    if(all[i].off) continue;
+    if(!all[i].present.length && !(all[i].pay||[]).length) continue;
+    fees += feeOf(all[i]);
+    pool += poolOf(all[i]);
+    cash += payOf(all[i], "cash");
+  }
+  var qr = 0;
+  for(i=0;i<all.length;i++){
+    if(all[i].off) continue;
+    qr += payOf(all[i], "qr");
+  }
+  var got = 0, adj = 0, salaryPaid = 0, bankGiven = 0;
+  for(i=0;i<S.money.length;i++){
+    var m = S.money[i];
+    if(m.kind === "adjust"){ adj += m.amount; continue; }
+    got += m.amount;
+    var sp = splitOf(m);
+    salaryPaid += sp.salary; bankGiven += sp.bank;
+  }
+  return { fees:fees, pool:pool, cash:cash, qr:qr, got:got, adj:adj,
+           salaryPaid:salaryPaid, bankGiven:bankGiven,
+           total: fees + pool - cash - got + adj };
+}
+
+/* ---------- render: header ---------- */
+function renderHeader(){
+  var d = parseIso(view.date);
+  var isToday = view.date === iso(new Date());
+  el("dSub").textContent = DAYS[d.getDay()] + (isToday ? " · сегодня" : "");
+  el("dMain").textContent = d.getDate() + " " + MONTHS[d.getMonth()];
+  el("btnToday").style.visibility = isToday ? "hidden" : "visible";
+  el("datePick").value = view.date;
+}
+
+/* ---------- render: day ---------- */
+function renderDay(){
+  renderHeader();
+
+  var b = el("demoBanner");
+  b.innerHTML = "";
+  if(S.demo){
+    var div = document.createElement("div");
+    div.className = "banner";
+    div.innerHTML = '<div><b>Это пример, а не ваши данные</b>Фамилии, отметки и суммы вымышленные — чтобы было видно, как всё работает.<button type="button" id="wipeDemo">Очистить и начать со своими</button></div>';
+    b.appendChild(div);
+    el("wipeDemo").onclick = function(){
+      confirmModal("Очистить примеры",
+        "Вымышленные фамилии, отметки и суммы будут удалены. Ваши ставки, цены и расписание останутся.",
+        "Очистить",
+        function(){
+          var fresh = defaults();
+          fresh.demo = false;
+          fresh.settings = S.settings;
+          fresh.schedule = S.schedule;
+          S = fresh;
+          save(); applyTheme(); renderAll(); switchScreen("scDay");
+        });
+    };
+  }
+
+  var list = sessionsForDate(view.date);
+  var wrap = el("slots");
+  wrap.innerHTML = "";
+  if(!list.length){
+    var e = document.createElement("div");
+    e.className = "card empty";
+    e.textContent = "В этот день тренировок по расписанию нет.";
+    wrap.appendChild(e);
+  }
+  var dayFee = 0, dayPool = 0, dayKids = 0, dayCash = 0, dayQr = 0;
+
+  list.forEach(function(s){
+    var marked = !s.ghost && (s.present.length > 0 || s.off || s.type === "indiv");
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "slot" + (s.off ? " off" : marked ? (s.type==="indiv" ? " indiv done" : " done") : "");
+    var kindTxt = s.type === "indiv" ? "индивидуальная" : "группа";
+    var status;
+    if(s.off) status = '<span class="slot-status">отменена</span>';
+    else if(!marked) status = '<span class="slot-status pending">не отмечено</span>';
+    else if(s.type === "indiv") status = '<span class="slot-status">' + (s.present.length ? escapeHtml(kidName(s.present[0])) : "никого") + '</span>';
+    else status = '<span class="slot-status"><b>' + s.present.length + '</b> из ' + kidsForSlot(s.time).length + '</span>';
+
+    btn.innerHTML =
+      '<span class="slot-bar"></span>' +
+      '<span class="slot-body">' +
+        '<span class="slot-line"><span class="slot-time mono">' + s.time + '</span>' +
+        '<span class="slot-kind">' + kindTxt + '</span></span>' +
+        status +
+      '</span>' +
+      '<span class="slot-right">' +
+        (s.off ? '' :
+          '<span class="slot-count mono">' + (marked ? s.present.length : "—") + '</span>' +
+          '<span class="slot-sum mono">' + (marked ? money(poolOf(s)) : "") + '</span>') +
+      '</span>';
+    btn.onclick = function(){ openAtt(s.date, s.time); };
+    wrap.appendChild(btn);
+
+    if(!s.off && marked){
+      dayFee += feeOf(s); dayPool += poolOf(s);
+      dayKids += s.present.length;
+      dayCash += payOf(s, "cash"); dayQr += payOf(s, "qr");
+    }
+  });
+
+  var t = el("dayTotals");
+  t.innerHTML =
+    row("Ваша зарплата", money(dayFee)) +
+    row("Бассейну за " + dayKids + " " + plural(dayKids, "ребёнка","детей","детей"), money(dayPool)) +
+    (dayCash ? row("Наличными вам", money(dayCash)) : "") +
+    (dayQr ? row("По QR начальнику", money(dayQr)) : "") +
+    '<div class="dsrow tot"><span>Ушло из ваших рук</span><b class="mono">' + money(dayPool) + '</b></div>';
+
+  el("navBal").textContent = shortMoney(balance().total);
+}
+
+function row(k,v){
+  return '<div class="dsrow"><span>' + k + '</span><b class="mono">' + v + '</b></div>';
+}
+function plural(n,a,b,c){
+  var n10 = n % 10, n100 = n % 100;
+  if(n10 === 1 && n100 !== 11) return a;
+  if(n10 >= 2 && n10 <= 4 && (n100 < 10 || n100 >= 20)) return b;
+  return c;
+}
+function shortMoney(n){
+  var s = n < 0 ? "−" : "+";
+  var a = Math.abs(Math.round(n));
+  if(a >= 1000) return s + (a/1000).toFixed(a >= 10000 ? 0 : 1).replace(".",",") + "к";
+  return s + a;
+}
+function kidsForSlot(time){
+  return S.kids.filter(function(k){ return !k.arch && hasSlot(k, time); });
+}
+function escapeHtml(s){
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+/* ---------- render: money ---------- */
+function renderMoney(){
+  var b = balance();
+  var box = el("balBox");
+  box.className = "balance " + (b.total > 0 ? "pos" : b.total < 0 ? "neg" : "");
+  el("balLab").textContent = b.total > 0 ? "Начальник должен вам" : b.total < 0 ? "Вы должны начальнику" : "Расчёт сошёлся";
+  el("balVal").textContent = money(Math.abs(b.total));
+  el("balHint").textContent = b.total > 0
+    ? "Ваша зарплата плюс то, что вы внесли за бассейн"
+    : b.total < 0 ? "У вас на руках больше, чем начислено" : "";
+
+  el("ledger").innerHTML =
+    led("plus","Зарплата за тренировки", countSess(), b.fees) +
+    led("plus","Внесено за бассейн", "по числу пришедших", b.pool) +
+    led("minus","Получено от начальника", S.money.length + " " + plural(S.money.length,"перевод","перевода","переводов"), -b.got) +
+    led("minus","Наличные от родителей", "оставлены вам в зачёт", -b.cash) +
+    (b.qr ? led("flat","Оплачено по QR", "ушло начальнику мимо вас", b.qr) : "") +
+    (b.adj ? led(b.adj>0?"plus":"minus","Корректировки","ручные правки", b.adj) : "");
+
+  var boss = bossName();
+  var salaryOwed = b.fees - b.salaryPaid;
+  var bankOwed = b.pool - b.bankGiven;
+  el("splitBox").innerHTML =
+    splitRow("Зарплата",
+      salaryOwed > 0 ? boss + " не доплатил: начислено " + money(b.fees) + ", выплачено " + money(b.salaryPaid)
+      : salaryOwed < 0 ? "переплатил: начислено " + money(b.fees) + ", выплачено " + money(b.salaryPaid)
+      : "начислено и выплачено поровну",
+      salaryOwed) +
+    splitRow("Бассейн",
+      bankOwed > 0 ? "внесли своих больше, чем он выдал: " + money(b.pool) + " против " + money(b.bankGiven)
+      : bankOwed < 0 ? "выдал с запасом: " + money(b.bankGiven) + ", внесено " + money(b.pool)
+      : "выдано ровно столько, сколько внесено",
+      bankOwed) +
+    splitRow("Наличные от родителей",
+      b.cash ? "деньги школы, лежат у вас на руках" : "родители пока ничего вам не давали",
+      -b.cash) +
+    (b.adj ? splitRow("Ручные правки", "внесены вами вручную", b.adj) : "") +
+    splitRow(b.total > 0 ? boss + " должен вам" : b.total < 0 ? "Вы должны" : "Всё сошлось",
+      "плюс — деньги в вашу пользу, минус — ваш долг",
+      b.total, " total");
+
+  var mv = el("moves");
+  mv.innerHTML = "";
+  if(!S.money.length){
+    mv.innerHTML = '<div class="empty">Пока ничего не записано. Каждый раз, когда начальник переводит деньги — жмите «Движение денег».</div>';
+  } else {
+    S.money.slice().sort(function(a,c){ return a.date < c.date ? 1 : -1; }).forEach(function(m){
+      var d = document.createElement("div");
+      d.className = "move";
+      var label = m.kind === "payout" ? "Перевод" :
+                  m.kind === "advance" ? "На бассейн" :
+                  m.kind === "salary" ? "Зарплата" : "Корректировка";
+      var sp = splitOf(m);
+      var detail = m.kind === "payout"
+        ? "зарплата " + money(sp.salary) +
+          (m.salFrom && m.salTo ? " за " + fmtShort(m.salFrom) + "—" + fmtShort(m.salTo) : "") +
+          ", на бассейн " + money(sp.bank)
+        : (m.note ? escapeHtml(m.note) : "");
+      d.innerHTML =
+        '<div class="m-t">' + label + '<small>' + fmtShort(m.date) +
+        (detail ? " · " + detail : "") + '</small></div>' +
+        '<div class="m-a mono">' + money(m.amount) + '</div>';
+      var act = document.createElement("button");
+      act.type = "button"; act.className = "m-act"; act.textContent = "✎";
+      act.setAttribute("aria-label", "Изменить запись от " + fmtShort(m.date));
+      act.onclick = function(){ moneyModal(m); };
+      d.appendChild(act);
+      mv.appendChild(d);
+    });
+  }
+  el("navBal").textContent = shortMoney(b.total);
+}
+function bossName(){
+  var b = (S.settings.bossName || "").trim();
+  return b || "Начальник";
+}
+/* value > 0 — в вашу пользу (начальник должен), < 0 — вы должны */
+function splitRow(title, sub, value, extra){
+  var cls = value > 0 ? "ok" : value < 0 ? "owe" : "";
+  var sign = value > 0 ? "+" : value < 0 ? "−" : "";
+  return '<div class="split-row ' + cls + (extra || "") + '"><div class="st"><b>' +
+    title + '</b><small>' + sub + '</small></div><div class="sv mono">' +
+    sign + money(Math.abs(value)) + '</div></div>';
+}
+
+function countSess(){
+  var all = allSessions(), g = 0, i = 0, x;
+  for(x=0;x<all.length;x++){
+    if(all[x].off) continue;
+    if(all[x].type === "group"){ if(all[x].present.length) g++; }
+    else i++;
+  }
+  return g + " " + plural(g,"групповая","групповых","групповых") + ", " + i + " " + plural(i,"индив.","индив.","индив.");
+}
+function led(cls,title,sub,amount){
+  var sign = cls === "plus" ? "+" : cls === "minus" ? "−" : "·";
+  return '<div class="led ' + cls + '"><div class="sign">' + sign + '</div>' +
+    '<div class="txt">' + title + '<small>' + sub + '</small></div>' +
+    '<div class="amt mono">' + money(Math.abs(amount)) + '</div></div>';
+}
+function fmtShort(d){
+  var p = parseIso(d);
+  return p.getDate() + " " + MONTHS[p.getMonth()].slice(0,3) + ".";
+}
+
+/* ---------- render: kids ---------- */
+function renderKids(){
+  var wrap = el("kidsList");
+  wrap.innerHTML = "";
+  var active = S.kids.filter(function(k){ return !k.arch; });
+  var arch = S.kids.filter(function(k){ return k.arch; });
+  el("kidsLabel").textContent = "Дети · " + active.length + " " + plural(active.length,"активный","активных","активных");
+
+  if(!S.kids.length){
+    wrap.innerHTML = '<div class="empty">Список пуст. Добавьте детей — или сразу отмечайте их на тренировке кнопкой «Новенький».</div>';
+  }
+  active.slice().sort(byName).forEach(function(k){ wrap.appendChild(kidRow(k)); });
+  arch.slice().sort(byName).forEach(function(k){ wrap.appendChild(kidRow(k)); });
+
+}
+
+function applyTheme(){
+  var t = (S.settings && S.settings.theme) || "auto";
+  if(t === "auto") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", t);
+}
+
+function renderSettings(){
+  el("sFeeGroup").value = S.settings.feeGroup;
+  el("sFeeIndiv").value = S.settings.feeIndiv;
+  el("sPoolChild").value = S.settings.poolChild;
+  el("sPoolIndiv").value = S.settings.poolIndiv;
+  el("sPriceSub").value = S.settings.priceSub || 0;
+  el("sPriceIndiv").value = S.settings.priceIndiv || 0;
+  el("sPriceTrial").value = S.settings.priceTrial || 0;
+
+  el("sBoss").value = S.settings.bossName || "";
+
+  renderSyncBox();
+
+  var cur = S.settings.theme || "auto";
+  document.querySelectorAll("#themeSeg button").forEach(function(b){
+    b.classList.toggle("on", b.getAttribute("data-t") === cur);
+  });
+}
+
+/* ---------- экран недели ---------- */
+var WEEK_ORDER = [1,2,3,4,5,6,0];
+
+function scheduleMap(){
+  var map = {};
+  WEEK_ORDER.forEach(function(d){
+    (S.schedule[d] || []).forEach(function(t){ (map[t] = map[t] || []).push(d); });
+  });
+  S.kids.forEach(function(k){
+    if(k.arch) return;
+    slotsOf(k).forEach(function(t){ if(!map[t]) map[t] = []; });
+  });
+  return map;
+}
+
+function renderWeek(){
+  var map = scheduleMap();
+  var times = Object.keys(map).sort();
+  var gl = el("groupList");
+  gl.innerHTML = "";
+
+  if(!times.length){
+    gl.innerHTML = '<div class="empty">Ни одной группы. Нажмите «Новая группа»: укажите время и отметьте дни, когда она ходит.</div>';
+  }
+  times.forEach(function(t){
+    var days = map[t], n = kidsForSlot(t).length;
+    var row = document.createElement("div");
+    row.className = "grprow" + (days.length ? "" : " orphan");
+
+    var gt = document.createElement("div");
+    gt.className = "gt mono"; gt.textContent = t;
+
+    var mid = document.createElement("div");
+    mid.className = "gmid";
+    var ds = document.createElement("div");
+    ds.className = "dayset";
+    WEEK_ORDER.forEach(function(d){
+      var sp = document.createElement("span");
+      sp.textContent = DAYS_SHORT[d];
+      if(days.indexOf(d) >= 0) sp.className = "on";
+      ds.appendChild(sp);
+    });
+    var gk = document.createElement("div");
+    gk.className = "gk";
+    gk.textContent = (days.length ? "" : "нет в расписании · ") +
+      n + " " + plural(n, "ребёнок", "ребёнка", "детей");
+    mid.appendChild(ds); mid.appendChild(gk);
+
+    var ed = document.createElement("button");
+    ed.type = "button"; ed.className = "kid-act"; ed.textContent = "✎";
+    ed.setAttribute("aria-label", "Изменить группу " + t);
+    ed.onclick = function(){ groupModal(t); };
+
+    row.appendChild(gt); row.appendChild(mid); row.appendChild(ed);
+    gl.appendChild(row);
+  });
+
+  var ov = el("weekOverview");
+  ov.innerHTML = "";
+  WEEK_ORDER.forEach(function(d){
+    var list = (S.schedule[d] || []).slice().sort();
+    var r = document.createElement("div");
+    r.className = "wk-row" + (list.length ? "" : " free");
+    r.innerHTML = '<div class="wd"></div><div class="wt mono"></div><div class="wn"></div>';
+    r.querySelector(".wd").textContent = DAYS_SHORT[d];
+    r.querySelector(".wt").textContent = list.length ? list.join("   ") : "выходной";
+    r.querySelector(".wn").textContent = list.length
+      ? list.length + " " + plural(list.length, "группа", "группы", "групп") : "";
+    ov.appendChild(r);
+  });
+}
+
+function normSlot(raw){
+  var t = raw.trim().replace(".", ":");
+  if(!/^\d{1,2}:\d{2}$/.test(t)) return "";
+  var pp = t.split(":");
+  if(+pp[0] > 23 || +pp[1] > 59) return "";
+  return pad(+pp[0]) + ":" + pp[1];
+}
+
+function groupModal(time){
+  var isNew = !time;
+  var days = [];
+  if(!isNew) WEEK_ORDER.forEach(function(d){
+    if((S.schedule[d] || []).indexOf(time) >= 0) days.push(d);
+  });
+
+  openModal(
+    '<div class="modal-h">' + (isNew ? "Новая группа" : "Группа " + time) + '</div>' +
+    '<div class="field"><label for="grTime">Время</label>' +
+      '<input class="mono" id="grTime" type="text" placeholder="17:00"></div>' +
+    '<div class="field"><label>Дни, когда она ходит</label>' +
+      '<div class="daypick" id="grDays"></div></div>' +
+    '<div class="note" id="grNote"></div>' +
+    '<div class="btnrow">' +
+      (isNew ? '' : '<button class="btn" id="grDel" type="button">Удалить</button>') +
+      '<button class="btn primary" id="grOk" type="button">Сохранить</button>' +
+    '</div>' +
+    '<button class="btn" id="grCancel" type="button">Отмена</button>',
+    function(c){
+      var inp = c.querySelector("#grTime");
+      if(!isNew) inp.value = time;
+      var dp = c.querySelector("#grDays");
+      WEEK_ORDER.forEach(function(d){
+        var b = document.createElement("button");
+        b.type = "button"; b.textContent = DAYS_SHORT[d];
+        if(days.indexOf(d) >= 0) b.className = "on";
+        b.onclick = function(){
+          var i = days.indexOf(d);
+          if(i >= 0){ days.splice(i, 1); b.classList.remove("on"); }
+          else { days.push(d); b.classList.add("on"); }
+        };
+        dp.appendChild(b);
+      });
+
+      var n = isNew ? 0 : kidsForSlot(time).length;
+      c.querySelector("#grNote").textContent = isNew
+        ? "Группа встанет в выбранные дни каждой недели. Детей привяжете к ней на вкладке «Дети» или прямо на тренировке."
+        : "В группе " + n + " " + plural(n, "ребёнок", "ребёнка", "детей") +
+          ". Поменяете время — они переедут вместе с группой.";
+
+      setTimeout(function(){ if(isNew) inp.focus(); }, 60);
+      c.querySelector("#grCancel").onclick = closeModal;
+
+      if(!isNew) c.querySelector("#grDel").onclick = function(){
+        var k = kidsForSlot(time).length;
+        confirmModal("Убрать группу " + time,
+          "Из расписания она пропадёт." +
+          (k ? " " + k + " " + plural(k, "ребёнок останется", "ребёнка останутся", "детей останутся") +
+               " в списке без времени." : "") + " Прошлые тренировки и отчёты сохранятся.",
+          "Убрать",
+          function(){
+            WEEK_ORDER.forEach(function(d){
+              S.schedule[d] = (S.schedule[d] || []).filter(function(x){ return x !== time; });
+            });
+            save(); renderAll();
+          });
+      };
+
+      c.querySelector("#grOk").onclick = function(){
+        var btn = c.querySelector("#grOk");
+        var t = normSlot(inp.value);
+        if(!t){ inp.focus(); inp.select(); return; }
+        if(!days.length){
+          btn.textContent = "Отметьте хотя бы один день";
+          setTimeout(function(){ btn.textContent = "Сохранить"; }, 1800);
+          return;
+        }
+        WEEK_ORDER.forEach(function(d){
+          S.schedule[d] = (S.schedule[d] || []).filter(function(x){
+            return x !== t && (isNew || x !== time);
+          });
+        });
+        days.forEach(function(d){
+          S.schedule[d].push(t);
+          S.schedule[d].sort();
+        });
+        if(!isNew && t !== time){
+          S.kids.forEach(function(k){
+            var arr = slotsOf(k).slice();
+            var i = arr.indexOf(time);
+            if(i < 0) return;
+            if(arr.indexOf(t) >= 0) arr.splice(i, 1); else arr[i] = t;
+            k.slots = arr;
+          });
+        }
+        save(); closeModal(); renderAll();
+      };
+    }
+  );
+}
+
+function kidRow(k){
+  var d = document.createElement("div");
+  d.className = "kidrow" + (k.arch ? " arch" : "");
+  var nm = document.createElement("div");
+  nm.className = "nm"; nm.textContent = fullName(k);
+  var tg = document.createElement("div");
+  tg.className = "tags";
+  var list = slotsOf(k).slice().sort();
+  if(!list.length){
+    var none = document.createElement("span");
+    none.className = "tag"; none.textContent = "без времени";
+    tg.appendChild(none);
+  }
+  list.forEach(function(t){
+    var sp = document.createElement("span");
+    sp.className = "tag"; sp.textContent = t;
+    tg.appendChild(sp);
+  });
+  var ed = document.createElement("button");
+  ed.type = "button"; ed.className = "kid-act"; ed.textContent = "✎";
+  ed.setAttribute("aria-label","Изменить: " + fullName(k));
+  ed.onclick = function(){ kidModal(k); };
+  d.appendChild(nm); d.appendChild(tg); d.appendChild(ed);
+  return d;
+}
+
+/* ---------- attendance sheet ---------- */
+function openAtt(date, time){
+  view.openKey = keyOf(date,time);
+  realSession(date,time);
+  renderAtt();
+  el("attSheet").classList.add("on");
+}
+function currentSession(){
+  return S.sessions[view.openKey];
+}
+function renderAtt(){
+  var s = currentSession();
+  if(!s) return;
+  el("attTime").textContent = s.time;
+  el("attKind").textContent = (s.type === "indiv" ? "Индивидуальная" : "Группа") + " · " + fmtShort(s.date) +
+    (s.off ? " · отменена" : "");
+
+  var list = el("attList");
+  list.innerHTML = "";
+
+  if(s.type === "indiv"){
+    var all = S.kids.filter(function(k){ return !k.arch || s.present.indexOf(k.id) >= 0; }).sort(byName);
+    if(!all.length) list.innerHTML = '<div class="empty">Список детей пуст. Жмите кнопку ниже.</div>';
+    all.forEach(function(k){ list.appendChild(attItem(k, s)); });
+  } else {
+    var own = kidsForSlot(s.time).slice().sort(byName);
+    var guests = [];
+    s.present.forEach(function(id){
+      if(!own.some(function(k){ return k.id === id; })){
+        var g = kidById(id); if(g) guests.push(g);
+      }
+    });
+    guests.sort(byName);
+
+    if(!own.length && !guests.length){
+      list.innerHTML = '<div class="empty">К этому времени никто не привязан. Добавьте детей кнопками ниже.</div>';
+    }
+    own.forEach(function(k){ list.appendChild(attItem(k, s)); });
+    guests.forEach(function(k){ list.appendChild(attItem(k, s)); });
+  }
+
+  el("attCount").textContent = s.present.length;
+  el("attPool").textContent = money(poolOf(s));
+}
+
+function byName(a, b){ return fullName(a).localeCompare(fullName(b), "ru"); }
+
+function attItem(k, s){
+  var here = s.present.indexOf(k.id) >= 0;
+  var paid = (s.pay||[]).filter(function(p){ return p.kidId === k.id; })[0];
+  var item = document.createElement("div");
+  item.className = "att-item" + (here ? " here" : "");
+
+  var hit = document.createElement("button");
+  hit.type = "button"; hit.className = "att-hit";
+  hit.innerHTML = '<span class="box">✓</span><span class="att-name"></span>';
+  hit.querySelector(".att-name").textContent = fullName(k);
+  hit.onclick = function(){
+    var i = s.present.indexOf(k.id);
+    if(i >= 0) s.present.splice(i,1);
+    else if(s.type === "indiv") s.present = [k.id];
+    else s.present.push(k.id);
+    save(); renderAtt(); renderDay();
+  };
+
+  var pay = document.createElement("button");
+  pay.type = "button";
+  var isQr = paid && (paid.way || "cash") === "qr";
+  pay.className = "paybtn" + (paid ? (isQr ? " qr" : " paid") : "");
+  pay.textContent = paid
+    ? (isQr ? "→" : "") + money(paid.amount).replace(" ₽","")
+    : "₽";
+  pay.setAttribute("aria-label", paid ? "Оплата: " + fullName(k) : "Записать оплату: " + fullName(k));
+  pay.onclick = function(){ payModal(k, s); };
+
+  item.appendChild(hit); item.appendChild(pay);
+  return item;
+}
+
+function guestModal(){
+  var s = currentSession();
+  if(!s) return;
+  var others = S.kids.filter(function(k){
+    return !k.arch && s.present.indexOf(k.id) < 0 && !hasSlot(k, s.time);
+  }).sort(byName);
+
+  openModal(
+    '<div class="modal-h">Кто пришёл из другой группы</div>' +
+    '<div class="field"><input id="gSearch" type="text" autocomplete="off" placeholder="Начните вводить фамилию"></div>' +
+    '<div class="pick" id="gList"></div>' +
+    '<div class="note">Ребёнок отметится в этой тренировке, но останется в своей группе. Если его вообще нет в системе, закройте и жмите «Новенький».</div>' +
+    '<button class="btn" id="gCancel" type="button">Закрыть</button>',
+    function(c){
+      var box = c.querySelector("#gList");
+      function paint(q){
+        box.innerHTML = "";
+        var f = others.filter(function(k){
+          return !q || fullName(k).toLowerCase().indexOf(q) >= 0;
+        });
+        if(!f.length){
+          box.innerHTML = '<div class="empty">' +
+            (others.length ? "Никого не нашлось." : "Все дети уже в этом списке.") + '</div>';
+          return;
+        }
+        f.forEach(function(k){
+          var b = document.createElement("button");
+          b.type = "button";
+          b.innerHTML = '<span class="pn"></span><span class="tag"></span>';
+          b.querySelector(".pn").textContent = fullName(k);
+          b.querySelector(".tag").textContent = slotsOf(k).join(" ") || "без времени";
+          b.onclick = function(){
+            if(s.type === "indiv") s.present = [k.id];
+            else s.present.push(k.id);
+            save(); closeModal(); renderAtt(); renderDay();
+          };
+          box.appendChild(b);
+        });
+      }
+      paint("");
+      var inp = c.querySelector("#gSearch");
+      inp.oninput = function(){ paint(inp.value.trim().toLowerCase()); };
+      c.querySelector("#gCancel").onclick = closeModal;
+    }
+  );
+}
+
+/* ---------- admin view ---------- */
+function renderAdmin(){
+  var s = currentSession();
+  var names = s.present.map(kidName).sort(function(a,b){ return a.localeCompare(b, "ru"); });
+  var html = '<div class="adm-time mono">' + s.time + '</div><ul class="adm-list">';
+  names.forEach(function(n,i){
+    html += '<li><span class="n mono">' + (i+1) + '</span><span>' + escapeHtml(n) + '</span></li>';
+  });
+  if(!names.length) html += '<li><span>Никого не отмечено</span></li>';
+  html += '</ul><div class="adm-tot">' +
+    '<div><div class="k">Детей</div><div class="v mono">' + s.present.length + '</div></div>' +
+    '<div><div class="k">К оплате</div><div class="v mono">' + money(poolOf(s)) + '</div></div>' +
+    '</div>';
+  el("admBody").innerHTML = html;
+  el("admSheet").classList.add("on");
+}
+
+/* ---------- reports ---------- */
+function rub(n){
+  return String(Math.round(Math.abs(n))).replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " руб";
+}
+
+function sessionText(s){
+  if(s.off) return s.time + "  отменена";
+  var head = s.time + "  " + (s.type === "indiv" ? "инд. " : "") + s.present.length;
+  if(!s.present.length) return head;
+  return head + "\n" + s.present.map(kidName).join("\n");
+}
+
+function dayReport(date){
+  var d = parseIso(date);
+  var isToday = date === iso(new Date());
+  var list = sessionsForDate(date).filter(function(s){ return !s.ghost && (s.present.length || s.off); });
+
+  var heads = 0, pool = 0, pays = [];
+  list.forEach(function(s){
+    if(s.off) return;
+    heads += s.present.length;
+    pool += poolOf(s);
+    (s.pay||[]).forEach(function(p){
+      pays.push(kidName(p.kidId) + " — " + PAY_KINDS[p.kind || "other"] + ", " +
+                rub(p.amount) + " (" + PAY_WAYS[p.way || "cash"] + ")");
+    });
+  });
+
+  var boss = (S.settings.bossName || "").trim();
+  var lines = [
+    (boss ? boss + ", " : "") + (isToday ? "сегодня " : "") +
+    d.getDate() + " " + MONTHS[d.getMonth()] + ", " + DAYS[d.getDay()] +
+    ", всего " + heads + " " + plural(heads, "человек", "человека", "человек"),
+    ""
+  ];
+  list.forEach(function(s){
+    lines.push(sessionText(s));
+    lines.push("");
+  });
+  if(!list.length) lines.push("Тренировок не было.", "");
+  lines.push("Бассейну: " + rub(pool));
+  if(pays.length){
+    lines.push("", "Оплата принята:");
+    pays.forEach(function(x){ lines.push(x); });
+  }
+  return lines.join("\n");
+}
+
+/* ---------- modals ---------- */
+function openModal(html, after){
+  var c = el("modalCard");
+  c.innerHTML = html;
+  el("modal").classList.add("on");
+  if(after) after(c);
+}
+function closeModal(){ el("modal").classList.remove("on"); }
+
+function confirmModal(title, text, okLabel, onYes){
+  openModal(
+    '<div class="modal-h">' + title + '</div>' +
+    '<div class="note">' + text + '</div>' +
+    '<div class="btnrow">' +
+      '<button class="btn danger" id="cfOk" type="button">' + okLabel + '</button>' +
+      '<button class="btn" id="cfNo" type="button">Отмена</button>' +
+    '</div>',
+    function(c){
+      c.querySelector("#cfNo").onclick = closeModal;
+      c.querySelector("#cfOk").onclick = function(){ closeModal(); onYes(); };
+    }
+  );
+}
+
+function copyModal(title, text, note){
+  openModal(
+    '<div class="modal-h">' + title + '</div>' +
+    '<textarea class="copybox" id="cpBox" readonly></textarea>' +
+    (note ? '<div class="note">' + note + '</div>' : '') +
+    '<div class="btnrow"><button class="btn primary" id="cpBtn" type="button">Скопировать</button>' +
+    '<button class="btn" id="cpClose" type="button">Закрыть</button></div>',
+    function(c){
+      c.querySelector("#cpBox").value = text;
+      c.querySelector("#cpClose").onclick = closeModal;
+      c.querySelector("#cpBtn").onclick = function(){
+        var box = c.querySelector("#cpBox");
+        var btn = c.querySelector("#cpBtn");
+        box.focus(); box.select(); box.setSelectionRange(0, 99999);
+        var ok = false;
+        try { ok = document.execCommand("copy"); } catch(e){}
+        if(ok){ btn.textContent = "Скопировано ✓"; setTimeout(function(){ btn.textContent = "Скопировать"; }, 1600); }
+        else if(navigator.clipboard){
+          navigator.clipboard.writeText(text).then(function(){
+            btn.textContent = "Скопировано ✓";
+            setTimeout(function(){ btn.textContent = "Скопировать"; }, 1600);
+          }).catch(function(){ btn.textContent = "Выделите текст вручную"; });
+        } else { btn.textContent = "Выделите текст вручную"; }
+      };
+    }
+  );
+}
+
+var PAY_KINDS = { sub:"абонемент", indiv:"индивидуальная", trial:"пробное", other:"другое" };
+
+function priceFor(kind){
+  if(kind === "sub") return S.settings.priceSub || 0;
+  if(kind === "indiv") return S.settings.priceIndiv || 0;
+  if(kind === "trial") return S.settings.priceTrial || 0;
+  return 0;
+}
+
+function payModal(kid, s){
+  var existing = (s.pay||[]).filter(function(p){ return p.kidId === kid.id; })[0];
+  var start = existing ? (existing.kind || "other") : (s.type === "indiv" ? "indiv" : "sub");
+  openModal(
+    '<div class="modal-h">Деньги от родителя</div>' +
+    '<div class="note"><b>' + escapeHtml(fullName(kid)) + '</b> — наличные, которые начальник разрешил оставить вам в зачёт. Сумма уменьшит его долг перед вами.</div>' +
+    '<div class="field"><label>За что</label><div class="seg" id="pKind">' +
+      '<button type="button" data-k="sub">Абонемент</button>' +
+      '<button type="button" data-k="indiv">Индив.</button>' +
+      '<button type="button" data-k="trial">Пробное</button>' +
+    '</div></div>' +
+    '<div class="field"><label for="pAmt">Сумма, ₽</label><input class="mono" id="pAmt" type="number" inputmode="numeric" placeholder="сколько дали"></div>' +
+    '<div class="field"><label>Как заплатили</label><div class="seg" id="pWay">' +
+      '<button type="button" data-w="cash">Наличными мне</button>' +
+      '<button type="button" data-w="qr">По QR начальнику</button>' +
+    '</div></div>' +
+    '<div class="note" id="pWayNote"></div>' +
+    '<div class="btnrow">' +
+      (existing ? '<button class="btn" id="pDel" type="button">Удалить</button>' : '') +
+      '<button class="btn primary" id="pOk" type="button">Записать</button>' +
+    '</div>' +
+    '<button class="btn" id="pCancel" type="button">Отмена</button>',
+    function(c){
+      var inp = c.querySelector("#pAmt");
+      var kind = start;
+      var way = existing ? (existing.way || "cash") : "cash";
+      var wayNotes = {
+        cash: "Деньги у вас на руках — уменьшают долг начальника перед вами.",
+        qr: "Деньги ушли сразу начальнику. На ваш расчёт не влияют, записываем только для отчёта."
+      };
+      function paint(){
+        c.querySelectorAll("#pKind button").forEach(function(b){
+          b.classList.toggle("on", b.getAttribute("data-k") === kind);
+        });
+        c.querySelectorAll("#pWay button").forEach(function(b){
+          b.classList.toggle("on", b.getAttribute("data-w") === way);
+        });
+        c.querySelector("#pWayNote").textContent = wayNotes[way];
+      }
+      c.querySelectorAll("#pWay button").forEach(function(b){
+        b.onclick = function(){ way = b.getAttribute("data-w"); paint(); };
+      });
+      c.querySelectorAll("#pKind button").forEach(function(b){
+        b.onclick = function(){
+          kind = b.getAttribute("data-k");
+          paint();
+          var p = priceFor(kind);
+          if(p) inp.value = p;
+          inp.focus();
+        };
+      });
+      paint();
+      if(existing) inp.value = existing.amount;
+      else if(priceFor(kind)) inp.value = priceFor(kind);
+      setTimeout(function(){ inp.focus(); inp.select(); }, 60);
+
+      c.querySelector("#pCancel").onclick = closeModal;
+      if(existing) c.querySelector("#pDel").onclick = function(){
+        s.pay = s.pay.filter(function(p){ return p.kidId !== kid.id; });
+        save(); closeModal(); renderAtt(); renderDay();
+      };
+      c.querySelector("#pOk").onclick = function(){
+        var v = parseInt(inp.value, 10);
+        if(!v || v <= 0){ inp.focus(); return; }
+        s.pay = (s.pay||[]).filter(function(p){ return p.kidId !== kid.id; });
+        s.pay.push({ kidId: kid.id, amount: v, kind: kind, way: way });
+        if(s.present.indexOf(kid.id) < 0) s.present.push(kid.id);
+        save(); closeModal(); renderAtt(); renderDay();
+      };
+    }
+  );
+}
+
+function kidModal(kid){
+  var isNew = !kid;
+  var slots = uniqueSlots();
+  openModal(
+    '<div class="modal-h">' + (isNew ? "Новый ребёнок" : "Изменить") + '</div>' +
+    '<div class="setgrid">' +
+      '<div class="field"><label for="kName">Фамилия</label><input id="kName" type="text" autocomplete="off" placeholder="Иванов"></div>' +
+      '<div class="field"><label for="kFirst">Имя</label><input id="kFirst" type="text" autocomplete="off" placeholder="Матвей"></div>' +
+    '</div>' +
+    '<div class="field"><label>Когда ходит</label>' +
+      '<div class="timepick" id="kSlots"></div></div>' +
+    '<div class="field"><label for="kSlotNew">Другое время</label>' +
+      '<div class="addrow"><input class="mono" id="kSlotNew" type="text" placeholder="12:00">' +
+      '<button type="button" id="kSlotAdd">+</button></div></div>' +
+    '<div id="kHints"></div>' +
+    '<div class="btnrow">' +
+      (isNew ? '' : '<button class="btn" id="kArch" type="button">' + (kid.arch ? "Вернуть" : "В архив") + '</button>') +
+      '<button class="btn primary" id="kOk" type="button">Сохранить</button>' +
+    '</div>' +
+    '<button class="btn" id="kCancel" type="button">Отмена</button>',
+    function(c){
+      var n = c.querySelector("#kName"), f = c.querySelector("#kFirst");
+      var chosen = isNew ? [] : slotsOf(kid).slice();
+      if(!isNew){ n.value = kid.name || ""; f.value = kid.first || ""; }
+      else {
+        var cs0 = currentSession();
+        if(cs0 && el("attSheet").classList.contains("on")) chosen = [cs0.time];
+      }
+
+      var pickBox = c.querySelector("#kSlots");
+      function paintSlots(){
+        var all = slots.slice();
+        chosen.forEach(function(t){ if(all.indexOf(t) < 0) all.push(t); });
+        all.sort();
+        pickBox.innerHTML = "";
+        if(!all.length){
+          var hint = document.createElement("div");
+          hint.className = "note";
+          hint.textContent = "Времён пока нет — заведите группы на вкладке «Неделя» или впишите время ниже.";
+          pickBox.appendChild(hint);
+          return;
+        }
+        all.forEach(function(t){
+          var b = document.createElement("button");
+          b.type = "button"; b.textContent = t;
+          if(chosen.indexOf(t) >= 0) b.className = "on";
+          b.onclick = function(){
+            var i = chosen.indexOf(t);
+            if(i >= 0) chosen.splice(i, 1); else chosen.push(t);
+            paintSlots();
+          };
+          pickBox.appendChild(b);
+        });
+      }
+      paintSlots();
+
+      c.querySelector("#kSlotAdd").onclick = function(){
+        var inp = c.querySelector("#kSlotNew");
+        var t = normSlot(inp.value);
+        if(!t){ inp.focus(); inp.select(); return; }
+        if(chosen.indexOf(t) < 0) chosen.push(t);
+        if(slots.indexOf(t) < 0) slots.push(t);
+        inp.value = "";
+        paintSlots();
+      };
+      setTimeout(function(){ n.focus(); }, 60);
+
+      var hints = c.querySelector("#kHints");
+      function paintHints(){
+        var qn = n.value.trim().toLowerCase();
+        var qf = f.value.trim().toLowerCase();
+        hints.innerHTML = "";
+        if(qn.length < 2) return;
+        var found = S.kids.filter(function(k){
+          if(!isNew && k.id === kid.id) return false;
+          if((k.name || "").toLowerCase().indexOf(qn) !== 0) return false;
+          if(qf && (k.first || "").toLowerCase().indexOf(qf) !== 0) return false;
+          return true;
+        }).sort(byName).slice(0, 5);
+        if(!found.length) return;
+
+        var lab = document.createElement("div");
+        lab.className = "hint-lab";
+        lab.textContent = "Такие уже есть — может, это он?";
+        hints.appendChild(lab);
+
+        var box = document.createElement("div");
+        box.className = "pick";
+        found.forEach(function(k){
+          var b = document.createElement("button");
+          b.type = "button";
+          b.innerHTML = '<span class="pn"></span><span class="tag"></span>';
+          b.querySelector(".pn").textContent = fullName(k);
+          b.querySelector(".tag").textContent = k.arch ? "в архиве" : (slotsOf(k).join(" ") || "без времени");
+          b.onclick = function(){ useExisting(k); };
+          box.appendChild(b);
+        });
+        hints.appendChild(box);
+      }
+      function useExisting(k){
+        if(k.arch) k.arch = false;
+        var cs = currentSession();
+        if(cs && el("attSheet").classList.contains("on")){
+          if(cs.present.indexOf(k.id) < 0){
+            if(cs.type === "indiv") cs.present = [k.id];
+            else cs.present.push(k.id);
+          }
+          save(); closeModal(); renderAtt(); renderDay();
+        } else {
+          save(); closeModal(); renderAll();
+          kidModal(k);
+        }
+      }
+      if(isNew){ n.oninput = paintHints; f.oninput = paintHints; }
+
+      c.querySelector("#kCancel").onclick = closeModal;
+      if(!isNew) c.querySelector("#kArch").onclick = function(){
+        kid.arch = !kid.arch; save(); closeModal(); renderAll();
+      };
+      c.querySelector("#kOk").onclick = function(){
+        var name = n.value.trim();
+        var first = f.value.trim();
+        if(!name){ n.focus(); return; }
+        var slot = chosen.slice().sort();
+        if(isNew){
+          var nk = { id:uid(), name:name, first:first, slots:slot, arch:false };
+          S.kids.push(nk);
+          var cs = currentSession();
+          if(cs && el("attSheet").classList.contains("on")){
+            if(cs.type === "indiv") cs.present = [nk.id]; else cs.present.push(nk.id);
+          }
+        } else { kid.name = name; kid.first = first; kid.slots = slot; }
+        save(); closeModal(); renderAll();
+        if(el("attSheet").classList.contains("on")) renderAtt();
+      };
+    }
+  );
+}
+function uniqueSlots(){
+  var set = {}, out = [], d, i;
+  for(d in S.schedule){ (S.schedule[d]||[]).forEach(function(t){ set[t] = 1; }); }
+  S.kids.forEach(function(k){ slotsOf(k).forEach(function(t){ set[t] = 1; }); });
+  for(i in set) out.push(i);
+  return out.sort();
+}
+
+function moneyModal(edit){
+  var isEdit = !!edit;
+  openModal(
+    '<div class="modal-h">' + (isEdit ? "Изменить запись" : "Деньги от начальника") + '</div>' +
+    '<div class="field"><label>Что это</label><div class="seg" id="mKind">' +
+      '<button type="button" data-k="payout">Перевод</button>' +
+      '<button type="button" data-k="adjust">Правка</button>' +
+    '</div></div>' +
+    '<div class="field"><label for="mAmt">Сколько скинул, ₽</label>' +
+      '<input class="mono" id="mAmt" type="number" inputmode="numeric" placeholder="30000"></div>' +
+    '<div class="field"><label for="mDate">Дата перевода</label>' +
+      '<input class="mono" id="mDate" type="date"></div>' +
+    '<div id="mSplit"></div>' +
+    '<div class="field"><label for="mNote">Заметка</label>' +
+      '<input id="mNote" type="text" placeholder="перевод на карту"></div>' +
+    '<div class="note" id="mHint"></div>' +
+    '<div class="btnrow"><button class="btn primary" id="mOk" type="button">' +
+      (isEdit ? "Сохранить" : "Записать") + '</button>' +
+      '<button class="btn" id="mCancel" type="button">Отмена</button></div>' +
+    (isEdit ? '<button class="btn danger" id="mDel" type="button">Удалить запись</button>' : ''),
+    function(c){
+      var hints = {
+        payout: "Одна сумма, которую скинул начальник. Из неё вычитается ваша зарплата за указанный период, остальное — банк на оплату бассейна.",
+        adjust: "Ручная правка баланса. Со знаком минус, если долг начальника надо уменьшить."
+      };
+      var kind = isEdit ? (edit.kind === "adjust" ? "adjust" : "payout") : "payout";
+      var amtEl = c.querySelector("#mAmt");
+      var dateEl = c.querySelector("#mDate");
+      var noteEl = c.querySelector("#mNote");
+      var splitEl = c.querySelector("#mSplit");
+      var hintEl = c.querySelector("#mHint");
+      var salaryEdited = false;
+
+      dateEl.value = isEdit ? edit.date : view.date;
+      if(isEdit){
+        amtEl.value = edit.amount;
+        noteEl.value = edit.note || "";
+      }
+
+      splitEl.innerHTML =
+        '<div class="field"><label>Зарплата за период</label>' +
+          '<div class="daterange">' +
+            '<input class="mono" id="mFrom" type="date" aria-label="Начало периода">' +
+            '<span>—</span>' +
+            '<input class="mono" id="mTo" type="date" aria-label="Конец периода">' +
+          '</div></div>' +
+        '<div class="note" id="mFees"></div>' +
+        '<div class="field"><label for="mSal">Из них ваша зарплата, ₽</label>' +
+          '<input class="mono" id="mSal" type="number" inputmode="numeric"></div>' +
+        '<div class="note" id="mBank"></div>';
+
+      var fromEl = c.querySelector("#mFrom");
+      var toEl = c.querySelector("#mTo");
+      var salEl = c.querySelector("#mSal");
+      var feesEl = c.querySelector("#mFees");
+      var bankEl = c.querySelector("#mBank");
+
+      if(isEdit && edit.kind === "payout"){
+        fromEl.value = edit.salFrom || nextPeriodStart(edit.date, edit.id);
+        toEl.value = edit.salTo || edit.date;
+        salEl.value = edit.salary || 0;
+        salaryEdited = true;
+      } else {
+        toEl.value = dateEl.value;
+        fromEl.value = nextPeriodStart(dateEl.value, isEdit ? edit.id : null);
+      }
+
+      function periodFees(){
+        var f = fromEl.value, t = toEl.value;
+        if(!f || !t || f > t) return { total:0, g:0, ind:0, bad:true };
+        return feesBetween(f, t);
+      }
+      function refreshFees(){
+        var f = periodFees();
+        if(f.bad){
+          feesEl.textContent = "Проверьте даты: начало периода позже конца.";
+          return;
+        }
+        var parts = [];
+        if(f.g) parts.push(f.g + " " + plural(f.g,"групповая","групповых","групповых"));
+        if(f.ind) parts.push(f.ind + " " + plural(f.ind,"индив.","индив.","индив."));
+        feesEl.innerHTML = "За этот период вы наработали <b>" + money(f.total) + "</b>" +
+          (parts.length ? " — " + parts.join(", ") : " — тренировок не было");
+        if(!salaryEdited) salEl.value = f.total;
+      }
+      function refreshBank(){
+        var total = parseInt(amtEl.value, 10) || 0;
+        var sal = parseInt(salEl.value, 10) || 0;
+        var bank = total - sal;
+        bankEl.innerHTML = bank < 0
+          ? "Зарплата больше перевода на <b>" + money(-bank) + "</b> — проверьте суммы."
+          : "Останется банка на бассейн: <b>" + money(bank) + "</b>";
+      }
+      function refreshAll(){ refreshFees(); refreshBank(); }
+
+      function paintKind(){
+        c.querySelectorAll("#mKind button").forEach(function(b){
+          b.classList.toggle("on", b.getAttribute("data-k") === kind);
+        });
+        splitEl.hidden = kind !== "payout";
+        hintEl.textContent = hints[kind];
+        if(kind === "payout") refreshAll();
+      }
+      c.querySelectorAll("#mKind button").forEach(function(b){
+        b.onclick = function(){ kind = b.getAttribute("data-k"); paintKind(); };
+      });
+      paintKind();
+
+      amtEl.oninput = refreshBank;
+      salEl.oninput = function(){ salaryEdited = true; refreshBank(); };
+      fromEl.onchange = function(){ salaryEdited = false; refreshAll(); };
+      toEl.onchange = function(){ salaryEdited = false; refreshAll(); };
+      dateEl.onchange = function(){
+        if(!salaryEdited){
+          toEl.value = dateEl.value;
+          fromEl.value = nextPeriodStart(dateEl.value, isEdit ? edit.id : null);
+        }
+        refreshAll();
+      };
+
+      setTimeout(function(){ amtEl.focus(); }, 60);
+      c.querySelector("#mCancel").onclick = closeModal;
+
+      if(isEdit) c.querySelector("#mDel").onclick = function(){
+        confirmModal("Удалить запись",
+          "Запись от " + fmtShort(edit.date) + " на " + money(edit.amount) +
+          " будет удалена, баланс пересчитается.",
+          "Удалить",
+          function(){
+            S.money = S.money.filter(function(x){ return x.id !== edit.id; });
+            save(); renderMoney();
+          });
+      };
+
+      c.querySelector("#mOk").onclick = function(){
+        var v = parseInt(amtEl.value, 10);
+        if(!v){ amtEl.focus(); return; }
+        var rec = {
+          id: isEdit ? edit.id : uid(),
+          date: dateEl.value || view.date,
+          kind: kind,
+          amount: v,
+          note: noteEl.value.trim()
+        };
+        if(kind === "payout"){
+          rec.salary = Math.max(0, Math.min(parseInt(salEl.value, 10) || 0, v));
+          rec.salFrom = fromEl.value || "";
+          rec.salTo = toEl.value || rec.date;
+        }
+        if(isEdit){
+          for(var i = 0; i < S.money.length; i++){
+            if(S.money[i].id === edit.id){ S.money[i] = rec; break; }
+          }
+        } else {
+          S.money.push(rec);
+        }
+        save(); closeModal(); renderMoney();
+      };
+    }
+  );
+}
+
+function sessionMenu(){
+  var s = currentSession();
+  openModal(
+    '<div class="modal-h">' + s.time + " · " + (s.type === "indiv" ? "индивидуальная" : "группа") + '</div>' +
+    '<div class="btnrow"><button class="btn" id="xType" type="button">Сделать ' + (s.type === "indiv" ? "групповой" : "индивидуальной") + '</button></div>' +
+    '<div class="btnrow"><button class="btn" id="xOff" type="button">' + (s.off ? "Вернуть тренировку" : "Отменить тренировку") + '</button></div>' +
+    '<div class="btnrow"><button class="btn" id="xDel" type="button">Удалить из дня</button></div>' +
+    '<button class="btn" id="xCancel" type="button">Закрыть</button>',
+    function(c){
+      c.querySelector("#xCancel").onclick = closeModal;
+      c.querySelector("#xType").onclick = function(){
+        s.type = s.type === "indiv" ? "group" : "indiv";
+        if(s.type === "indiv" && s.present.length > 1) s.present = s.present.slice(0,1);
+        save(); closeModal(); renderAtt(); renderDay();
+      };
+      c.querySelector("#xOff").onclick = function(){
+        s.off = !s.off; save(); closeModal(); renderAtt(); renderDay();
+      };
+      c.querySelector("#xDel").onclick = function(){
+        confirmModal("Удалить тренировку",
+          "Отметки и оплаты по ней тоже удалятся. Если тренировку просто отменил бассейн, лучше «Отменить тренировку» — тогда день не потеряется.",
+          "Удалить",
+          function(){
+            delete S.sessions[view.openKey];
+            save();
+            el("attSheet").classList.remove("on");
+            renderDay();
+          });
+      };
+    }
+  );
+}
+
+function addSessionModal(){
+  var slots = uniqueSlots();
+  openModal(
+    '<div class="modal-h">Добавить тренировку</div>' +
+    '<div class="field"><label>Тип</label><div class="seg" id="aKind">' +
+      '<button type="button" data-k="indiv" class="on">Индивидуальная</button>' +
+      '<button type="button" data-k="group">Группа</button>' +
+    '</div></div>' +
+    '<div class="field"><label for="aTime">Время</label><input class="mono" id="aTime" type="text" list="slotList2" placeholder="12:00"></div>' +
+    '<datalist id="slotList2">' + slots.map(function(t){ return '<option value="' + t + '"></option>'; }).join("") + '</datalist>' +
+    '<div class="note">Разовая тренировка только на этот день. Постоянные группы задаются в расписании на вкладке «Дети».</div>' +
+    '<div class="btnrow"><button class="btn primary" id="aOk" type="button">Добавить</button>' +
+    '<button class="btn" id="aCancel" type="button">Отмена</button></div>',
+    function(c){
+      var kind = "indiv";
+      c.querySelectorAll("#aKind button").forEach(function(b){
+        b.onclick = function(){
+          c.querySelectorAll("#aKind button").forEach(function(x){ x.classList.remove("on"); });
+          b.classList.add("on"); kind = b.getAttribute("data-k");
+        };
+      });
+      setTimeout(function(){ c.querySelector("#aTime").focus(); }, 60);
+      c.querySelector("#aCancel").onclick = closeModal;
+      c.querySelector("#aOk").onclick = function(){
+        var t = c.querySelector("#aTime").value.trim().replace(".",":");
+        if(!/^\d{1,2}:\d{2}$/.test(t)){ c.querySelector("#aTime").focus(); return; }
+        if(t.length === 4) t = "0" + t;
+        var k = keyOf(view.date, t);
+        if(!S.sessions[k]) S.sessions[k] = { date:view.date, time:t, type:kind, present:[], pay:[], off:false };
+        save(); closeModal(); renderDay(); openAtt(view.date, t);
+      };
+    }
+  );
+}
+
+/* ---------- импорт списка ---------- */
+function normTime(h, m){
+  var hh = parseInt(h, 10);
+  if(isNaN(hh) || hh > 23) return "";
+  return pad(hh) + ":" + (m || "00");
+}
+function parseKids(text){
+  var out = [], cur = "";
+  text.split(/\r?\n/).forEach(function(raw){
+    var line = raw.replace(/^\s*[-–—•*]+\s*/, "").replace(/^\s*\d+[).]\s*/, "").trim();
+    if(!line) return;
+    var head = line.match(/^(?:группа|гpуппа|гр\.?|на|время)?\s*(\d{1,2})(?:[:.](\d{2}))?\s*(?:ч|час[а-я]*)?\s*$/i);
+    if(head){
+      var t = normTime(head[1], head[2]);
+      if(t){ cur = t; return; }
+    }
+    line.split(/[;,]+/).forEach(function(chunk){
+      var t = chunk.trim();
+      if(!t) return;
+      var slot = cur, m;
+      if((m = t.match(/(\d{1,2})[:.](\d{2})\s*$/))){
+        slot = normTime(m[1], m[2]) || slot;
+        t = t.slice(0, m.index).trim();
+      } else if((m = t.match(/\s(\d{1,2})\s*$/))){
+        var alt = normTime(m[1], null);
+        if(alt){ slot = alt; t = t.slice(0, m.index).trim(); }
+      }
+      t = t.replace(/[.,;:]+$/, "").trim();
+      if(!t) return;
+      var w = t.split(/\s+/);
+      out.push({ name: w[0], first: w.slice(1).join(" "), slot: slot });
+    });
+  });
+  return out;
+}
+
+function importModal(){
+  openModal(
+    '<div class="modal-h">Импорт списка</div>' +
+    '<div class="note">Вставьте список из заметок или ватсапа. Понимает строку со временем как заголовок группы, а также фамилию с именем в одной строке или несколько через запятую.</div>' +
+    '<textarea class="copybox" id="imBox" placeholder="17:00&#10;Иванов Матвей&#10;Петрова Соня&#10;&#10;18:00&#10;Сидоров Лев, Орлова Ева"></textarea>' +
+    '<div class="btnrow"><button class="btn primary" id="imGo" type="button">Разобрать</button>' +
+    '<button class="btn" id="imCancel" type="button">Отмена</button></div>',
+    function(c){
+      c.querySelector("#imCancel").onclick = closeModal;
+      setTimeout(function(){ c.querySelector("#imBox").focus(); }, 60);
+      c.querySelector("#imGo").onclick = function(){
+        var found = parseKids(c.querySelector("#imBox").value);
+        if(!found.length){
+          var b = c.querySelector("#imGo");
+          b.textContent = "Ничего не распознал";
+          setTimeout(function(){ b.textContent = "Разобрать"; }, 1800);
+          return;
+        }
+        importPreview(found);
+      };
+    }
+  );
+}
+
+function importPreview(found){
+  var fresh = [], dup = 0;
+  found.forEach(function(f){
+    var same = S.kids.filter(function(k){
+      return (k.name||"").toLowerCase() === f.name.toLowerCase() &&
+             (k.first||"").toLowerCase() === (f.first||"").toLowerCase();
+    })[0];
+    if(same){
+      dup++;
+      // тот же ребёнок в другом списке — значит ходит ещё и в это время
+      if(f.slot && !hasSlot(same, f.slot)) same.slots = slotsOf(same).concat([f.slot]).sort();
+    }
+    else fresh.push(f);
+  });
+  var preview = fresh.map(function(f){
+    return (f.name + (f.first ? " " + f.first : "")) + (f.slot ? "  —  " + f.slot : "  —  без времени");
+  }).join("\n");
+
+  var isDemo = S.demo;
+  openModal(
+    '<div class="modal-h">Распознано: ' + fresh.length + '</div>' +
+    (dup ? '<div class="note">Ещё ' + dup + ' уже есть в списке — пропущу, дублей не будет.</div>' : '') +
+    (isDemo ? '<div class="banner"><div><b>Сейчас загружен пример</b>Вымышленные фамилии сотру, чтобы они не смешались с настоящими.</div></div>' : '') +
+    '<textarea class="copybox" id="ipBox" readonly></textarea>' +
+    '<div class="note">Проверьте времена. Кого разобрало неверно — поправите карандашом в списке детей.</div>' +
+    '<div class="btnrow"><button class="btn primary" id="ipOk" type="button">Добавить ' + fresh.length + '</button>' +
+    '<button class="btn" id="ipBack" type="button">Назад</button></div>',
+    function(c){
+      c.querySelector("#ipBox").value = preview || "Все из списка уже заведены.";
+      c.querySelector("#ipBack").onclick = importModal;
+      c.querySelector("#ipOk").onclick = function(){
+        if(isDemo){
+          var clean = defaults();
+          clean.demo = false;
+          clean.settings = S.settings;
+          clean.schedule = S.schedule;
+          S = clean;
+        }
+        fresh.forEach(function(f){
+          S.kids.push({ id:uid(), name:f.name, first:f.first, slots: f.slot ? [f.slot] : [], arch:false });
+        });
+        S.demo = false;
+        save(); closeModal(); renderAll(); switchScreen("scKids");
+      };
+    }
+  );
+}
+
+function backupModal(){
+  var text = JSON.stringify(S);
+  copyModal("Резервная копия", text,
+    "Скопируйте и отправьте себе в избранное в ватсапе. Этот текст полностью восстанавливает все данные.");
+}
+function restoreModal(){
+  openModal(
+    '<div class="modal-h">Восстановить из копии</div>' +
+    '<div class="note">Вставьте текст резервной копии. Текущие данные будут заменены.</div>' +
+    '<textarea class="copybox" id="rBox" placeholder="Вставьте сюда"></textarea>' +
+    '<div class="btnrow"><button class="btn primary" id="rOk" type="button">Восстановить</button>' +
+    '<button class="btn" id="rCancel" type="button">Отмена</button></div>',
+    function(c){
+      c.querySelector("#rCancel").onclick = closeModal;
+      c.querySelector("#rOk").onclick = function(){
+        var t = c.querySelector("#rBox").value.trim();
+        try {
+          var p = JSON.parse(t);
+          if(!p.settings || !p.kids || !p.sessions) throw new Error("bad");
+          confirmModal("Восстановить из копии",
+            "Всё, что сейчас в приложении, будет заменено данными из этой копии. Отменить это будет нельзя.",
+            "Заменить",
+            function(){
+              S = migrate(p);
+              if(!S.settings.theme) S.settings.theme = "auto";
+              save(); applyTheme(); renderAll(); switchScreen("scDay");
+            });
+        } catch(e){
+          c.querySelector("#rOk").textContent = "Текст не подходит";
+          setTimeout(function(){ c.querySelector("#rOk").textContent = "Восстановить"; }, 1800);
+        }
+      };
+    }
+  );
+}
+
+function mondayOf(dateStr){
+  var d = parseIso(dateStr), wd = d.getDay();
+  d.setDate(d.getDate() + (wd === 0 ? -6 : 1 - wd));
+  return iso(d);
+}
+function statsFor(from, to){
+  var st = { fees:0, pool:0, cash:0, qr:0, got:0, g:0, ind:0, kids:0, days:{} };
+  allSessions().forEach(function(s){
+    if(s.date < from || s.date > to) return;
+    if(s.off || !s.present.length) return;
+    st.fees += feeOf(s); st.pool += poolOf(s);
+    st.cash += payOf(s, "cash"); st.qr += payOf(s, "qr");
+    st.kids += s.present.length;
+    if(s.type === "group") st.g++; else st.ind++;
+    (st.days[s.date] = st.days[s.date] || []).push(s);
+  });
+  S.money.forEach(function(x){
+    if(x.date < from || x.date > to) return;
+    if(x.kind !== "adjust") st.got += x.amount;
+  });
+  return st;
+}
+function summaryLines(st){
+  return [
+    "Групповых: " + st.g,
+    "Индивидуальных: " + st.ind,
+    "Детей всего: " + st.kids,
+    "",
+    "Ваша зарплата: " + money(st.fees),
+    "Бассейну внесено: " + money(st.pool),
+    "Наличными от родителей: " + money(st.cash),
+    "Оплачено родителями по QR: " + money(st.qr),
+    "Получено от начальника: " + money(st.got),
+    "",
+    "За период начальник должен: " + money(st.fees + st.pool - st.cash - st.got)
+  ];
+}
+
+function weekModal(){
+  var from = mondayOf(view.date), to = shiftDate(from, 6);
+  var st = statsFor(from, to);
+  var a = parseIso(from), b = parseIso(to);
+  var lines = ["Неделя " + a.getDate() + " " + MONTHS[a.getMonth()] +
+               " — " + b.getDate() + " " + MONTHS[b.getMonth()], ""];
+  var keys = Object.keys(st.days).sort();
+  if(!keys.length) lines.push("Тренировок за неделю не было.", "");
+  keys.forEach(function(dt){
+    var dd = parseIso(dt), g = 0, ind = 0, kids = 0, pool = 0;
+    st.days[dt].forEach(function(s){
+      if(s.type === "group") g++; else ind++;
+      kids += s.present.length; pool += poolOf(s);
+    });
+    var parts = [];
+    if(g) parts.push(g + " " + plural(g,"групповая","групповых","групповых"));
+    if(ind) parts.push(ind + " " + plural(ind,"индив.","индив.","индив."));
+    lines.push(DAYS_SHORT[dd.getDay()] + " " + dd.getDate() + ": " + parts.join(", ") +
+               " · " + kids + " " + plural(kids,"ребёнок","ребёнка","детей") +
+               " · бассейну " + money(pool));
+  });
+  lines.push("");
+  lines = lines.concat(summaryLines(st));
+  copyModal("Неделя", lines.join("\n"),
+    "Неделя с понедельника по воскресенье, в которую попадает день, открытый на вкладке «День».");
+}
+
+function monthModal(){
+  var d = parseIso(view.date), y = d.getFullYear(), m = d.getMonth();
+  var from = y + "-" + pad(m+1) + "-01";
+  var to = iso(new Date(y, m+1, 0));
+  var st = statsFor(from, to);
+  var lines = ["Итоги за " + MONTHS[m] + " " + y, ""].concat(summaryLines(st));
+  copyModal("Месяц", lines.join("\n"), "Месяц, который открыт на вкладке «День».");
+}
+
+/* ---------- wiring ---------- */
+function el(id){ return document.getElementById(id); }
+
+function switchScreen(id){
+  view.screen = id;
+  ["scHome","scDay","scWeek","scMoney","scKids","scSet"].forEach(function(s){
+    el(s).classList.toggle("on", s === id);
+  });
+  document.querySelectorAll(".nav button").forEach(function(b){
+    b.classList.toggle("on", b.getAttribute("data-scr") === id);
+  });
+  el("topBar").hidden = id === "scHome";
+  if(id === "scWeek") renderWeek();
+  if(id === "scSet") renderSettings();
+  if(id === "scMoney") renderMoney();
+  if(id === "scKids") renderKids();
+  if(id === "scDay") renderDay();
+  window.scrollTo(0,0);
+}
+
+function renderAll(){ renderDay(); renderWeek(); renderMoney(); renderKids(); }
+
+document.querySelectorAll(".nav button").forEach(function(b){
+  b.onclick = function(){ switchScreen(b.getAttribute("data-scr")); };
+});
+el("datePick").onchange = function(){
+  var v = el("datePick").value;
+  if(v){ view.date = v; renderDay(); }
+};
+el("btnPrev").onclick = function(){ view.date = shiftDate(view.date,-1); renderDay(); };
+el("btnNext").onclick = function(){ view.date = shiftDate(view.date, 1); renderDay(); };
+el("btnToday").onclick = function(){ view.date = iso(new Date()); renderDay(); };
+el("btnAddSession").onclick = addSessionModal;
+el("btnDayReport").onclick = function(){
+  copyModal("Отчёт за день", dayReport(view.date), "Скопируйте и отправьте начальнику в ватсап.");
+};
+el("btnAddMoney").onclick = moneyModal;
+el("btnWeek").onclick = weekModal;
+el("btnMonth").onclick = monthModal;
+el("btnAddKid").onclick = function(){ kidModal(null); };
+el("btnImport").onclick = importModal;
+el("btnAddGroup").onclick = function(){ groupModal(null); };
+document.querySelectorAll("#themeSeg button").forEach(function(b){
+  b.onclick = function(){
+    S.settings.theme = b.getAttribute("data-t");
+    save(); applyTheme(); renderSettings();
+  };
+});
+el("sBoss").onchange = function(){
+  S.settings.bossName = el("sBoss").value.trim();
+  save();
+};
+el("btnBackup").onclick = backupModal;
+el("btnRestore").onclick = restoreModal;
+
+el("attClose").onclick = function(){ el("attSheet").classList.remove("on"); renderDay(); };
+el("attMenu").onclick = sessionMenu;
+el("attAddKid").onclick = function(){ kidModal(null); };
+el("attGuest").onclick = guestModal;
+el("attAdmin").onclick = renderAdmin;
+el("attCopy").onclick = function(){
+  var s = currentSession();
+  copyModal("Тренировка " + s.time, fmtShort(s.date) + "\n\n" + sessionText(s) +
+    (s.off ? "" : "\n\nБассейну: " + rub(poolOf(s))), null);
+};
+el("admClose").onclick = function(){ el("admSheet").classList.remove("on"); };
+
+el("modal").onclick = function(e){ if(e.target === el("modal")) closeModal(); };
+
+["sFeeGroup","sFeeIndiv","sPoolChild","sPoolIndiv","sPriceSub","sPriceIndiv","sPriceTrial"].forEach(function(id){
+  var map = { sFeeGroup:"feeGroup", sFeeIndiv:"feeIndiv", sPoolChild:"poolChild", sPoolIndiv:"poolIndiv",
+              sPriceSub:"priceSub", sPriceIndiv:"priceIndiv", sPriceTrial:"priceTrial" };
+  el(id).onchange = function(){
+    var v = parseInt(el(id).value, 10);
+    if(isNaN(v) || v < 0){ el(id).value = S.settings[map[id]]; return; }
+    S.settings[map[id]] = v; save(); renderDay();
+  };
+});
+
+document.addEventListener("keydown", function(e){
+  if(e.key !== "Escape") return;
+  if(el("modal").classList.contains("on")) return closeModal();
+  if(el("admSheet").classList.contains("on")) return el("admSheet").classList.remove("on");
+  if(el("attSheet").classList.contains("on")){ el("attSheet").classList.remove("on"); renderDay(); }
+});
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load", function(){
+    navigator.serviceWorker.register("sw.js").catch(function(){});
+  });
+}
+
+S = load();
+if(!S.settings.theme) S.settings.theme = "auto";
+applyTheme();
+// первый запуск не считается правкой: иначе свежий телефон
+// затрёт своей пустышкой то, что лежит на сервере
+save(true);
+renderAll();
+switchScreen("scHome");
+initSync();
+})();
+</script>
+</body>
+</html>
