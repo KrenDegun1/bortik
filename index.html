@@ -859,6 +859,8 @@ function schedulePush(){
 
 function pushNow(){
   if(!sync.on) return Promise.resolve();
+  // демо-данные — не данные: пока их не тронули, на сервер им нечего делать
+  if(S.demo && !S.updatedAt){ setSync("demo"); return Promise.resolve(); }
   if(sync.pushedAt === S.updatedAt){ setSync("saved"); return Promise.resolve(); }
   if(navigator.onLine === false){ setSync("offline"); return Promise.resolve(); }
   setSync("saving");
@@ -919,7 +921,9 @@ function initSync(){
 
 function renderSyncBar(){
   var bar = el("syncBar");
-  if(!sync.on || sync.state === "saved" || sync.state === "idle"){ bar.hidden = true; return; }
+  if(!sync.on || sync.state === "saved" || sync.state === "idle" || sync.state === "demo"){
+    bar.hidden = true; return;
+  }
   var txt = "", cls = "";
   if(sync.state === "saving"){ txt = "Сохраняю на сервер…"; cls = "wait"; }
   else if(sync.state === "pending"){ txt = "Ещё не на сервере"; cls = "wait"; }
@@ -940,7 +944,8 @@ function renderSyncBox(){
     box.innerHTML = '<div class="note">Нет ключа доступа. Откройте приложение по своей ссылке — она заканчивается на #k=…</div>';
     return;
   }
-  var st = sync.state === "saved" ? ["Всё на сервере", "ok"]
+  var st = sync.state === "demo" ? ["Пример на сервер не уходит", ""]
+         : sync.state === "saved" ? ["Всё на сервере", "ok"]
          : sync.state === "saving" ? ["Отправляю…", ""]
          : sync.state === "pending" ? ["Ждёт отправки", "warn"]
          : sync.state === "offline" ? ["Нет сети", "warn"]
