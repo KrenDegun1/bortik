@@ -2035,7 +2035,10 @@ function uniqueSlots(){
 }
 
 function moneyModal(edit){
-  var isEdit = !!edit;
+  // правка — только настоящая запись из списка; всё прочее (в т.ч. событие клика) = новая
+  var isEdit = !!(edit && typeof edit === "object" && edit.id &&
+                  S.money.some(function(x){ return x.id === edit.id; }));
+  if(!isEdit) edit = null;
   openModal(
     '<div class="modal-h">' + (isEdit ? "Изменить запись" : "Деньги от начальника") + '</div>' +
     '<div class="field"><label>Что это</label><div class="seg" id="mKind">' +
@@ -2183,13 +2186,13 @@ function moneyModal(edit){
           rec.salFrom = fromEl.value || "";
           rec.salTo = toEl.value || rec.date;
         }
+        var replaced = false;
         if(isEdit){
           for(var i = 0; i < S.money.length; i++){
-            if(S.money[i].id === edit.id){ S.money[i] = rec; break; }
+            if(S.money[i].id === edit.id){ S.money[i] = rec; replaced = true; break; }
           }
-        } else {
-          S.money.push(rec);
         }
+        if(!replaced) S.money.push(rec);
         save(); closeModal(); renderMoney();
       };
     }
@@ -2517,7 +2520,7 @@ el("btnAddSession").onclick = addSessionModal;
 el("btnDayReport").onclick = function(){
   copyModal("Отчёт за день", dayReport(view.date), "Скопируйте и отправьте начальнику в ватсап.");
 };
-el("btnAddMoney").onclick = moneyModal;
+el("btnAddMoney").onclick = function(){ moneyModal(null); };
 el("btnWeek").onclick = weekModal;
 el("btnMonth").onclick = monthModal;
 el("btnAddKid").onclick = function(){ kidModal(null); };
