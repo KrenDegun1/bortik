@@ -423,6 +423,8 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
   flex:1;padding:11px 8px;border-radius:10px;border:1px solid var(--line-strong);
   background:var(--surface-2);font-weight:700;font-size:14px;color:var(--muted);
 }
+.seg.seg-2col{flex-wrap:wrap}
+.seg.seg-2col button{flex:1 1 calc(50% - 3px);min-width:calc(50% - 3px)}
 .seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
 :root[data-theme="dark"] .seg button.on{color:#06222a}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .seg button.on{color:#06222a}}
@@ -512,8 +514,9 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
       <button class="btn" id="btnMonth" type="button">За месяц</button>
     </div>
 
-    <div class="sect-label">Из чего сложился долг</div>
-    <div class="card split" id="splitBox"></div>
+    <div class="sect-label">Зарплата</div>
+    <div class="card split" id="salaryBox"></div>
+    <div class="note" id="combinedNote"></div>
 
     <div class="sect-label">Полученное от начальника</div>
     <div class="card movelist" id="moves"></div>
@@ -604,6 +607,10 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
         <div class="field">
           <label for="sPriceIndiv">Индивидуальная</label>
           <input class="mono" id="sPriceIndiv" type="number" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label for="sPriceOnce">Разовое занятие</label>
+          <input class="mono" id="sPriceOnce" type="number" inputmode="numeric">
         </div>
         <div class="field">
           <label for="sPriceTrial">Пробное занятие</label>
@@ -727,7 +734,7 @@ function defaults(){
     v: 1,
     demo: true,
     settings: { feeGroup:1000, feeIndiv:500, poolChild:400, poolIndiv:900,
-                priceSub:0, priceIndiv:1800, priceTrial:0, theme:"auto", bossName:"" },
+                priceSub:0, priceIndiv:1800, priceOnce:0, priceTrial:0, theme:"auto", bossName:"" },
     schedule: { 0:["10:00","11:00"], 1:[], 2:["17:00","18:00","19:00"], 3:["18:00"],
                 4:["17:00","18:00","19:00"], 5:[], 6:["10:00","11:00"] },
     kids: [],
@@ -1222,43 +1229,40 @@ function escapeHtml(s){
 /* ---------- render: money ---------- */
 function renderMoney(){
   var b = balance();
+  var boss = bossName();
+
+  /* Два независимых счёта, чтобы не смешивать чужие деньги со своим заработком:
+     касса — что прошло через руки, зарплата — что начислено и выплачено.
+     cashSide + salaryOwed === b.total (сводная строка внизу). */
+  var cashSide = b.pool - b.bankGiven - b.cash + b.adj;
+  var salaryOwed = b.fees - b.salaryPaid;
+
   var box = el("balBox");
-  box.className = "balance " + (b.total > 0 ? "pos" : b.total < 0 ? "neg" : "");
-  el("balLab").textContent = b.total > 0 ? "Начальник должен вам" : b.total < 0 ? "Вы должны начальнику" : "Расчёт сошёлся";
-  el("balVal").textContent = money(Math.abs(b.total));
-  el("balHint").textContent = b.total > 0
-    ? "Ваша зарплата плюс то, что вы внесли за бассейн"
-    : b.total < 0 ? "У вас на руках больше, чем начислено" : "";
+  box.className = "balance " + (cashSide > 0 ? "pos" : cashSide < 0 ? "neg" : "");
+  el("balLab").textContent = cashSide > 0 ? boss + " должен вам"
+    : cashSide < 0 ? "Вы должны " + boss.toLowerCase().replace(/^начальник$/, "начальнику")
+    : "По деньгам сошлось";
+  el("balVal").textContent = money(Math.abs(cashSide));
+  el("balHint").textContent = "Только чужие деньги: бассейн и наличные от родителей. Зарплата — ниже, отдельно.";
 
   el("ledger").innerHTML =
-    led("plus","Зарплата за тренировки", countSess(), b.fees) +
     led("plus","Внесено за бассейн", "по числу пришедших", b.pool) +
-    led("minus","Получено от начальника", S.money.length + " " + plural(S.money.length,"перевод","перевода","переводов"), -b.got) +
+    led("minus","Выдано на бассейн", "банковская часть переводов", -b.bankGiven) +
     led("minus","Наличные от родителей", "оставлены вам в зачёт", -b.cash) +
     (b.qr ? led("flat","Оплачено по QR", "ушло начальнику мимо вас", b.qr) : "") +
-    (b.adj ? led(b.adj>0?"plus":"minus","Корректировки","ручные правки", b.adj) : "");
+    (b.adj ? led(b.adj>0?"plus":"minus","Ручные правки","внесены вами вручную", b.adj) : "");
 
-  var boss = bossName();
-  var salaryOwed = b.fees - b.salaryPaid;
-  var bankOwed = b.pool - b.bankGiven;
-  el("splitBox").innerHTML =
-    splitRow("Зарплата",
-      salaryOwed > 0 ? boss + " не доплатил: начислено " + money(b.fees) + ", выплачено " + money(b.salaryPaid)
-      : salaryOwed < 0 ? "переплатил: начислено " + money(b.fees) + ", выплачено " + money(b.salaryPaid)
-      : "начислено и выплачено поровну",
-      salaryOwed) +
-    splitRow("Бассейн",
-      bankOwed > 0 ? "внесли своих больше, чем он выдал: " + money(b.pool) + " против " + money(b.bankGiven)
-      : bankOwed < 0 ? "выдал с запасом: " + money(b.bankGiven) + ", внесено " + money(b.pool)
-      : "выдано ровно столько, сколько внесено",
-      bankOwed) +
-    splitRow("Наличные от родителей",
-      b.cash ? "деньги школы, лежат у вас на руках" : "родители пока ничего вам не давали",
-      -b.cash) +
-    (b.adj ? splitRow("Ручные правки", "внесены вами вручную", b.adj) : "") +
-    splitRow(b.total > 0 ? boss + " должен вам" : b.total < 0 ? "Вы должны" : "Всё сошлось",
-      "плюс — деньги в вашу пользу, минус — ваш долг",
-      b.total, " total");
+  el("salaryBox").innerHTML =
+    splitRow("Начислено за тренировки", countSess(), b.fees) +
+    splitRow("Выплачено", b.salaryPaid ? "зарплатная часть переводов" : "пока ничего не выплачено", -b.salaryPaid) +
+    splitRow(salaryOwed > 0 ? "Вам должны зарплату" : salaryOwed < 0 ? "Зарплату переплатили" : "Зарплата закрыта",
+      "начислено минус выплачено", salaryOwed, " total");
+
+  var both = cashSide + salaryOwed;
+  el("combinedNote").textContent = "Если зачесть зарплату в счёт этих денег: " +
+    (both > 0 ? boss + " должен вам " + money(both)
+     : both < 0 ? "вы должны " + money(-both)
+     : "выходит ровно в ноль");
 
   var mv = el("moves");
   mv.innerHTML = "";
@@ -1289,7 +1293,7 @@ function renderMoney(){
       mv.appendChild(d);
     });
   }
-  el("navBal").textContent = shortMoney(b.total);
+  el("navBal").textContent = shortMoney(cashSide);
 }
 function bossName(){
   var b = (S.settings.bossName || "").trim();
@@ -1353,6 +1357,7 @@ function renderSettings(){
   el("sPoolIndiv").value = S.settings.poolIndiv;
   el("sPriceSub").value = S.settings.priceSub || 0;
   el("sPriceIndiv").value = S.settings.priceIndiv || 0;
+  el("sPriceOnce").value = S.settings.priceOnce || 0;
   el("sPriceTrial").value = S.settings.priceTrial || 0;
 
   el("sBoss").value = S.settings.bossName || "";
@@ -1806,11 +1811,12 @@ function copyModal(title, text, note){
   );
 }
 
-var PAY_KINDS = { sub:"абонемент", indiv:"индивидуальная", trial:"пробное", other:"другое" };
+var PAY_KINDS = { sub:"абонемент", once:"разовое", indiv:"индивидуальная", trial:"пробное", other:"другое" };
 
 function priceFor(kind){
   if(kind === "sub") return S.settings.priceSub || 0;
   if(kind === "indiv") return S.settings.priceIndiv || 0;
+  if(kind === "once") return S.settings.priceOnce || 0;
   if(kind === "trial") return S.settings.priceTrial || 0;
   return 0;
 }
@@ -1821,8 +1827,9 @@ function payModal(kid, s){
   openModal(
     '<div class="modal-h">Деньги от родителя</div>' +
     '<div class="note"><b>' + escapeHtml(fullName(kid)) + '</b> — наличные, которые начальник разрешил оставить вам в зачёт. Сумма уменьшит его долг перед вами.</div>' +
-    '<div class="field"><label>За что</label><div class="seg" id="pKind">' +
+    '<div class="field"><label>За что</label><div class="seg seg-2col" id="pKind">' +
       '<button type="button" data-k="sub">Абонемент</button>' +
+      '<button type="button" data-k="once">Разовое</button>' +
       '<button type="button" data-k="indiv">Индив.</button>' +
       '<button type="button" data-k="trial">Пробное</button>' +
     '</div></div>' +
@@ -2553,9 +2560,10 @@ el("admClose").onclick = function(){ el("admSheet").classList.remove("on"); };
 
 el("modal").onclick = function(e){ if(e.target === el("modal")) closeModal(); };
 
-["sFeeGroup","sFeeIndiv","sPoolChild","sPoolIndiv","sPriceSub","sPriceIndiv","sPriceTrial"].forEach(function(id){
+["sFeeGroup","sFeeIndiv","sPoolChild","sPoolIndiv","sPriceSub","sPriceIndiv","sPriceOnce","sPriceTrial"].forEach(function(id){
   var map = { sFeeGroup:"feeGroup", sFeeIndiv:"feeIndiv", sPoolChild:"poolChild", sPoolIndiv:"poolIndiv",
-              sPriceSub:"priceSub", sPriceIndiv:"priceIndiv", sPriceTrial:"priceTrial" };
+              sPriceSub:"priceSub", sPriceIndiv:"priceIndiv",
+              sPriceOnce:"priceOnce", sPriceTrial:"priceTrial" };
   el(id).onchange = function(){
     var v = parseInt(el(id).value, 10);
     if(isNaN(v) || v < 0){ el(id).value = S.settings[map[id]]; return; }
