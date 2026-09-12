@@ -628,6 +628,9 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
       <button class="btn" id="btnBackup" type="button">Бэкап</button>
       <button class="btn" id="btnRestore" type="button">Восстановить</button>
     </div>
+    <div class="btnrow">
+      <button class="btn" id="btnExport" type="button">Выгрузить таблицу</button>
+    </div>
     <div class="note">Всё хранится только в этом браузере. Раз в неделю жмите «Бэкап» и отправляйте текст себе в избранное — если телефон потеряется, данные восстановятся.</div>
   </section>
 
@@ -753,20 +756,21 @@ function seedDemo(st){
   var today = st.schedule[new Date().getDay()] || [];
   var slotA = today[0] || "17:00";
   var slotB = today[1] || (slotA === "18:00" ? "19:00" : "18:00");
-  for(i=0;i<names17.length;i++) st.kids.push({id:uid(), name:names17[i][0], first:names17[i][1], slots:[slotA], arch:false});
-  for(i=0;i<names18.length;i++) st.kids.push({id:uid(), name:names18[i][0], first:names18[i][1], slots:[slotB], arch:false});
+  for(i=0;i<names17.length;i++) st.kids.push({id:uid(), name:names17[i][0], first:names17[i][1], slots:[slotA], arch:false, d:1});
+  for(i=0;i<names18.length;i++) st.kids.push({id:uid(), name:names18[i][0], first:names18[i][1], slots:[slotB], arch:false, d:1});
   // Соня ходит в оба времени — показываем, что так можно
   if(slotA !== slotB) st.kids[1].slots = [slotA, slotB].sort();
 
   var dateToday = iso(new Date());
   var k = dateToday + "|" + slotA;
   st.sessions[k] = {
+    d: 1,
     date: dateToday, time: slotA, type: "group",
     present: st.kids.slice(0,7).map(function(x){return x.id;}),
     pay: [{ kidId: st.kids[1].id, amount: 4800, kind: "sub", way: "cash" }],
     off: false
   };
-  st.money.push({ id:uid(), date: shiftDate(dateToday,-2), kind:"payout", amount:12000, salary:2000, note:"перевод на карту" });
+  st.money.push({ id:uid(), d:1, date: shiftDate(dateToday,-2), kind:"payout", amount:12000, salary:2000, note:"перевод на карту" });
   return st;
 }
 
@@ -781,14 +785,31 @@ function load(){
   }
   return seedDemo(defaults());
 }
+/* Часы на телефоне и ноуте могут разойтись. Если взять голое "сейчас", метка
+   правки может оказаться старше той, что пришла с сервера, и правку потеряют. */
+function stampNow(){
+  var now = new Date().toISOString();
+  if(S.updatedAt && now <= S.updatedAt){
+    now = new Date(new Date(S.updatedAt).getTime() + 1).toISOString();
+  }
+  return now;
+}
 function save(fromServer){
-  if(!fromServer) S.updatedAt = new Date().toISOString();
+  if(!fromServer) S.updatedAt = stampNow();
   try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){}
+  renderNavBal();
   if(!fromServer) schedulePush();
 }
 
+/* Цифра под значком рубля — та же, что большая цифра на вкладке денег. */
+function renderNavBal(){
+  var b = balance();
+  el("navBal").textContent = shortMoney(b.pool - b.bankGiven - b.cash + b.adj);
+}
+
 /* ---------- синхронизация ---------- */
-var sync = { space:null, on:false, state:"idle", detail:"", timer:null, pushedAt:null, lastOk:null };
+var sync = { space:null, on:false, state:"idle", detail:"", timer:null,
+             pushedAt:null, lastOk:null, pulledOk:false };
 
 function spaceFromUrl(){
   var m = (location.hash || "").match(/[#&]k=([A-Za-z0-9_-]{24,})/);
@@ -833,13 +854,16 @@ function schedulePush(){
 
 function pushNow(){
   if(!sync.on) return Promise.resolve();
-  // демо-данные — не данные: пока их не тронули, на сервер им нечего делать
-  if(S.demo && !S.updatedAt){ setSync("demo"); return Promise.resolve(); }
+  // пока не прочитали сервер, писать в него нельзя: затрём то, чего не видели
+  if(!sync.pulledOk){ setSync("pending", "жду ответа сервера, чтобы не затереть чужие правки"); return Promise.resolve(); }
+  var payload = stateForServer();
+  // в приложении один образец и ничего своего — на сервере такому делать нечего
+  if(!hasRealData(payload)){ setSync("demo"); return Promise.resolve(); }
   if(sync.pushedAt === S.updatedAt){ setSync("saved"); return Promise.resolve(); }
   if(navigator.onLine === false){ setSync("offline"); return Promise.resolve(); }
   setSync("saving");
   var at = S.updatedAt;
-  return rpc("save_space", { k: sync.space, d: S }).then(function(){
+  return rpc("save_space", { k: sync.space, d: payload }).then(function(){
     sync.pushedAt = at;
     if(at === S.updatedAt) setSync("saved");
     else schedulePush();
@@ -851,6 +875,7 @@ function pushNow(){
 function pullNow(){
   if(!sync.on) return Promise.resolve("off");
   return rpc("load_space", { k: sync.space }).then(function(rows){
+    sync.pulledOk = true;
     var row = rows && rows[0];
     if(!row || !row.data || !row.data.settings) return "empty";
     var remote = row.data;
@@ -885,7 +910,10 @@ function initSync(){
     setSync("error", String(e && e.message || e).slice(0, 120));
   });
 
-  window.addEventListener("online", function(){ pushNow(); });
+  window.addEventListener("online", function(){
+    // сперва прочитать, потом писать — иначе перезапишем правки с другого устройства
+    pullNow().then(function(){ return pushNow(); }).catch(function(){});
+  });
   window.addEventListener("offline", function(){ setSync("offline"); });
   document.addEventListener("visibilitychange", function(){
     if(document.hidden) return;
@@ -1015,6 +1043,48 @@ function slotsOf(k){
 }
 function hasSlot(k, t){ return slotsOf(k).indexOf(t) >= 0; }
 
+/* Примеры помечены полем d. Всё, к чему прикоснулся человек, метку теряет
+   и становится настоящими данными — чтобы очистка примеров их не унесла. */
+function hasDemo(){
+  if((S.kids || []).some(function(k){ return k.d; })) return true;
+  for(var key in S.sessions){
+    if(S.sessions.hasOwnProperty(key) && S.sessions[key].d) return true;
+  }
+  return (S.money || []).some(function(m){ return m.d; });
+}
+function touched(o){ if(o && o.d) delete o.d; return o; }
+
+function stripDemo(st){
+  var gone = {};
+  (st.kids || []).forEach(function(k){ if(k.d) gone[k.id] = 1; });
+  st.kids = (st.kids || []).filter(function(k){ return !k.d; });
+  var keep = {};
+  for(var key in st.sessions){
+    if(!st.sessions.hasOwnProperty(key)) continue;
+    var ss = st.sessions[key];
+    if(ss.d) continue;
+    ss.present = (ss.present || []).filter(function(id){ return !gone[id]; });
+    ss.pay = (ss.pay || []).filter(function(pp){ return !gone[pp.kidId]; });
+    keep[key] = ss;
+  }
+  st.sessions = keep;
+  st.money = (st.money || []).filter(function(m){ return !m.d; });
+  st.demo = false;
+  return st;
+}
+function dropDemo(){ S = stripDemo(S); }
+
+/* На сервер уходит копия без примеров: настоящие записи синхронизируются
+   сразу, даже если тренер не убрала образец, а вымышленные не уезжают никогда. */
+function stateForServer(){
+  return stripDemo(JSON.parse(JSON.stringify(S)));
+}
+function hasRealData(st){
+  return (st.kids || []).length > 0 ||
+         Object.keys(st.sessions || {}).length > 0 ||
+         (st.money || []).length > 0;
+}
+
 function migrate(st){
   (st.kids || []).forEach(function(k){
     if(!Array.isArray(k.slots)) k.slots = k.slot ? [k.slot] : [];
@@ -1129,22 +1199,18 @@ function renderDay(){
 
   var b = el("demoBanner");
   b.innerHTML = "";
-  if(S.demo){
+  if(hasDemo()){
     var div = document.createElement("div");
     div.className = "banner";
     div.innerHTML = '<div><b>Это пример, а не ваши данные</b>Фамилии, отметки и суммы вымышленные — чтобы было видно, как всё работает.<button type="button" id="wipeDemo">Очистить и начать со своими</button></div>';
     b.appendChild(div);
     el("wipeDemo").onclick = function(){
-      confirmModal("Очистить примеры",
-        "Вымышленные фамилии, отметки и суммы будут удалены. Ваши ставки, цены и расписание останутся.",
-        "Очистить",
+      confirmModal("Убрать примеры",
+        "Удалю только вымышленные записи. Всё, что вы завели или отметили сами, останется на месте.",
+        "Убрать",
         function(){
-          var fresh = defaults();
-          fresh.demo = false;
-          fresh.settings = S.settings;
-          fresh.schedule = S.schedule;
-          S = fresh;
-          save(); applyTheme(); renderAll(); switchScreen("scDay");
+          dropDemo();
+          save(); renderAll(); switchScreen("scDay");
         });
     };
   }
@@ -1202,7 +1268,7 @@ function renderDay(){
     (dayQr ? row("По QR начальнику", money(dayQr)) : "") +
     '<div class="dsrow tot"><span>Ушло из ваших рук</span><b class="mono">' + money(dayPool) + '</b></div>';
 
-  el("navBal").textContent = shortMoney(balance().total);
+  renderNavBal();
 }
 
 function row(k,v){
@@ -1294,7 +1360,7 @@ function renderMoney(){
       mv.appendChild(d);
     });
   }
-  el("navBal").textContent = shortMoney(cashSide);
+  renderNavBal();
 }
 function bossName(){
   var b = (S.settings.bossName || "").trim();
@@ -1627,6 +1693,7 @@ function attItem(k, s){
   hit.innerHTML = '<span class="box">✓</span><span class="att-name"></span>';
   hit.querySelector(".att-name").textContent = fullName(k);
   hit.onclick = function(){
+    touched(s); touched(k);
     var i = s.present.indexOf(k.id);
     if(i >= 0) s.present.splice(i,1);
     else if(s.type === "indiv") s.present = [k.id];
@@ -1887,6 +1954,7 @@ function payModal(kid, s){
       c.querySelector("#pOk").onclick = function(){
         var v = parseInt(inp.value, 10);
         if(!v || v <= 0){ inp.focus(); return; }
+        touched(s); touched(kid);
         s.pay = (s.pay||[]).filter(function(p){ return p.kidId !== kid.id; });
         s.pay.push({ kidId: kid.id, amount: v, kind: kind, way: way });
         if(s.present.indexOf(kid.id) < 0) s.present.push(kid.id);
@@ -2027,7 +2095,7 @@ function kidModal(kid){
           if(cs && el("attSheet").classList.contains("on")){
             if(cs.type === "indiv") cs.present = [nk.id]; else cs.present.push(nk.id);
           }
-        } else { kid.name = name; kid.first = first; kid.slots = slot; }
+        } else { touched(kid); kid.name = name; kid.first = first; kid.slots = slot; }
         save(); closeModal(); renderAll();
         if(el("attSheet").classList.contains("on")) renderAtt();
       };
@@ -2218,11 +2286,13 @@ function sessionMenu(){
     function(c){
       c.querySelector("#xCancel").onclick = closeModal;
       c.querySelector("#xType").onclick = function(){
+        touched(s);
         s.type = s.type === "indiv" ? "group" : "indiv";
         if(s.type === "indiv" && s.present.length > 1) s.present = s.present.slice(0,1);
         save(); closeModal(); renderAtt(); renderDay();
       };
       c.querySelector("#xOff").onclick = function(){
+        touched(s);
         s.off = !s.off; save(); closeModal(); renderAtt(); renderDay();
       };
       c.querySelector("#xDel").onclick = function(){
@@ -2339,7 +2409,8 @@ function importPreview(found){
   var fresh = [], dup = 0;
   found.forEach(function(f){
     var same = S.kids.filter(function(k){
-      return (k.name||"").toLowerCase() === f.name.toLowerCase() &&
+      return !k.d &&
+             (k.name||"").toLowerCase() === f.name.toLowerCase() &&
              (k.first||"").toLowerCase() === (f.first||"").toLowerCase();
     })[0];
     if(same){
@@ -2353,11 +2424,11 @@ function importPreview(found){
     return (f.name + (f.first ? " " + f.first : "")) + (f.slot ? "  —  " + f.slot : "  —  без времени");
   }).join("\n");
 
-  var isDemo = S.demo;
+  var isDemo = hasDemo();
   openModal(
     '<div class="modal-h">Распознано: ' + fresh.length + '</div>' +
     (dup ? '<div class="note">Ещё ' + dup + ' уже есть в списке — пропущу, дублей не будет.</div>' : '') +
-    (isDemo ? '<div class="banner"><div><b>Сейчас загружен пример</b>Вымышленные фамилии сотру, чтобы они не смешались с настоящими.</div></div>' : '') +
+    (isDemo ? '<div class="banner"><div><b>Сейчас показан пример</b>Вымышленные фамилии уберу, чтобы не смешались с настоящими. Ваши записи останутся.</div></div>' : '') +
     '<textarea class="copybox" id="ipBox" readonly></textarea>' +
     '<div class="note">Проверьте времена. Кого разобрало неверно — поправите карандашом в списке детей.</div>' +
     '<div class="btnrow"><button class="btn primary" id="ipOk" type="button">Добавить ' + fresh.length + '</button>' +
@@ -2366,19 +2437,138 @@ function importPreview(found){
       c.querySelector("#ipBox").value = preview || "Все из списка уже заведены.";
       c.querySelector("#ipBack").onclick = importModal;
       c.querySelector("#ipOk").onclick = function(){
-        if(isDemo){
-          var clean = defaults();
-          clean.demo = false;
-          clean.settings = S.settings;
-          clean.schedule = S.schedule;
-          S = clean;
-        }
+        if(isDemo) dropDemo();
         fresh.forEach(function(f){
           S.kids.push({ id:uid(), name:f.name, first:f.first, slots: f.slot ? [f.slot] : [], arch:false });
         });
         S.demo = false;
         save(); closeModal(); renderAll(); switchScreen("scKids");
       };
+    }
+  );
+}
+
+/* ---------- выгрузка в таблицу ---------- */
+function csvCell(v){
+  var t = (v === null || v === undefined) ? "" : String(v);
+  return /[";\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+}
+function downloadCsv(name, rows){
+  // точка с запятой и BOM — чтобы Excel открыл кириллицу и колонки сразу правильно
+  var csv = rows.map(function(r){ return r.map(csvCell).join(";"); }).join("\r\n");
+  try {
+    var blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){
+      if(a.parentNode) a.parentNode.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 1500);
+    return true;
+  } catch(e){ return false; }
+}
+function sortedSessions(){
+  return allSessions().slice().sort(function(a, b){
+    if(a.date !== b.date) return a.date < b.date ? -1 : 1;
+    return a.time < b.time ? -1 : a.time > b.time ? 1 : 0;
+  });
+}
+function csvVisits(){
+  var rows = [["Дата","День недели","Время","Тип","Фамилия","Имя","Бассейну за него","Оплата","За что","Как заплатил"]];
+  sortedSessions().forEach(function(sn){
+    var d = parseIso(sn.date);
+    var per = sn.type === "group" ? S.settings.poolChild : S.settings.poolIndiv;
+    if(sn.off){
+      rows.push([sn.date, DAYS[d.getDay()], sn.time, "отменена", "", "", 0, "", "", ""]);
+      return;
+    }
+    if(!sn.present.length){
+      rows.push([sn.date, DAYS[d.getDay()], sn.time, sn.type === "indiv" ? "индивидуальная" : "группа", "", "", 0, "", "", ""]);
+      return;
+    }
+    sn.present.forEach(function(id){
+      var k = kidById(id);
+      var pay = (sn.pay || []).filter(function(x){ return x.kidId === id; })[0];
+      rows.push([
+        sn.date, DAYS[d.getDay()], sn.time,
+        sn.type === "indiv" ? "индивидуальная" : "группа",
+        k ? (k.name || "") : "удалён", k ? (k.first || "") : "",
+        per,
+        pay ? pay.amount : "",
+        pay ? PAY_KINDS[pay.kind || "other"] : "",
+        pay ? PAY_WAYS[pay.way || "cash"] : ""
+      ]);
+    });
+  });
+  return rows;
+}
+function csvMoney(){
+  var rows = [["Дата","Что","Сумма","Из них зарплата","На бассейн","Зарплата с","по","Заметка"]];
+  S.money.slice().sort(function(a, b){ return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; })
+    .forEach(function(m){
+      var sp = splitOf(m);
+      var label = m.kind === "payout" ? "перевод" : m.kind === "advance" ? "на бассейн"
+                : m.kind === "salary" ? "зарплата" : "ручная правка";
+      rows.push([m.date, label, m.amount,
+        m.kind === "adjust" ? "" : sp.salary,
+        m.kind === "adjust" ? "" : sp.bank,
+        m.salFrom || "", m.salTo || "", m.note || ""]);
+    });
+  return rows;
+}
+function csvDays(){
+  var byDay = {};
+  allSessions().forEach(function(sn){
+    if(sn.off) return;
+    var r = byDay[sn.date] || (byDay[sn.date] = { g:0, ind:0, kids:0, fee:0, pool:0, cash:0, qr:0 });
+    if(!sn.present.length && !(sn.pay || []).length) return;
+    if(sn.type === "group") r.g++; else r.ind++;
+    r.kids += sn.present.length;
+    r.fee += feeOf(sn); r.pool += poolOf(sn);
+    r.cash += payOf(sn, "cash"); r.qr += payOf(sn, "qr");
+  });
+  var rows = [["Дата","День недели","Групповых","Индивидуальных","Детей","Ваша зарплата","Бассейну","Наличными вам","По QR начальнику"]];
+  Object.keys(byDay).sort().forEach(function(dt){
+    var r = byDay[dt], d = parseIso(dt);
+    rows.push([dt, DAYS[d.getDay()], r.g, r.ind, r.kids, r.fee, r.pool, r.cash, r.qr]);
+  });
+  return rows;
+}
+
+function exportModal(){
+  var today = iso(new Date());
+  openModal(
+    '<div class="modal-h">Выгрузить таблицу</div>' +
+    '<div class="note">Файл CSV — открывается в Excel, Google Таблицах и в телефоне. Скачается в загрузки.</div>' +
+    '<div class="btnrow"><button class="btn" id="exVisits" type="button">Посещения</button></div>' +
+    '<div class="btnrow"><button class="btn" id="exDays" type="button">Итоги по дням</button></div>' +
+    '<div class="btnrow"><button class="btn" id="exMoney" type="button">Деньги от начальника</button></div>' +
+    '<div class="note" id="exNote"></div>' +
+    '<button class="btn" id="exClose" type="button">Закрыть</button>',
+    function(c){
+      c.querySelector("#exClose").onclick = closeModal;
+      function run(btnId, file, rows){
+        var b = c.querySelector(btnId);
+        b.onclick = function(){
+          var data = rows();
+          if(data.length < 2){
+            c.querySelector("#exNote").textContent = "Выгружать пока нечего — данных нет.";
+            return;
+          }
+          var okDl = downloadCsv(file, data);
+          c.querySelector("#exNote").textContent = okDl
+            ? "Готово: " + file + " — " + (data.length - 1) + " " +
+              plural(data.length - 1, "строка", "строки", "строк") + ". Ищите в загрузках."
+            : "Телефон не дал скачать файл. Попробуйте открыть приложение в браузере, а не с иконки.";
+        };
+      }
+      run("#exVisits", "bortik-visits-" + today + ".csv", csvVisits);
+      run("#exDays", "bortik-days-" + today + ".csv", csvDays);
+      run("#exMoney", "bortik-money-" + today + ".csv", csvMoney);
     }
   );
 }
@@ -2544,6 +2734,7 @@ el("sBoss").onchange = function(){
   S.settings.bossName = el("sBoss").value.trim();
   save();
 };
+el("btnExport").onclick = exportModal;
 el("btnBackup").onclick = backupModal;
 el("btnRestore").onclick = restoreModal;
 
