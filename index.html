@@ -1780,51 +1780,25 @@ function renderAdmin(){
 }
 
 /* ---------- reports ---------- */
-function rub(n){
-  return String(Math.round(Math.abs(n))).replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " руб";
+/* Отчёт начальнику — ровно в том виде, как тренер пишет его руками:
+   только фамилии, группы через пустую строку, оплата в скобках. */
+function payNote(p){
+  return " (" + p.amount + " " + ((p.way || "cash") === "qr" ? "по qr" : "наличкой") + ")";
 }
-
-function sessionText(s){
-  if(s.off) return s.time + "  отменена";
-  var head = s.time + "  " + (s.type === "indiv" ? "инд. " : "") + s.present.length;
-  if(!s.present.length) return head;
-  return head + "\n" + s.present.map(kidName).join("\n");
+function sessionLines(s){
+  var ids = s.present.slice();
+  // заплатил, но отметку сняли — деньги всё равно должны попасть в отчёт
+  (s.pay || []).forEach(function(p){ if(ids.indexOf(p.kidId) < 0) ids.push(p.kidId); });
+  return ids.map(function(id){
+    var p = (s.pay || []).filter(function(x){ return x.kidId === id; })[0];
+    return kidName(id) + (p ? payNote(p) : "");
+  });
 }
-
 function dayReport(date){
-  var d = parseIso(date);
-  var isToday = date === iso(new Date());
-  var list = sessionsForDate(date).filter(function(s){ return !s.ghost && (s.present.length || s.off); });
-
-  var heads = 0, pool = 0, pays = [];
-  list.forEach(function(s){
-    if(s.off) return;
-    heads += s.present.length;
-    pool += poolOf(s);
-    (s.pay||[]).forEach(function(p){
-      pays.push(kidName(p.kidId) + " — " + PAY_KINDS[p.kind || "other"] + ", " +
-                rub(p.amount) + " (" + PAY_WAYS[p.way || "cash"] + ")");
-    });
-  });
-
-  var boss = (S.settings.bossName || "").trim();
-  var lines = [
-    (boss ? boss + ", " : "") + (isToday ? "сегодня " : "") +
-    d.getDate() + " " + MONTHS[d.getMonth()] + ", " + DAYS[d.getDay()] +
-    ", всего " + heads + " " + plural(heads, "человек", "человека", "человек"),
-    ""
-  ];
-  list.forEach(function(s){
-    lines.push(sessionText(s));
-    lines.push("");
-  });
-  if(!list.length) lines.push("Тренировок не было.", "");
-  lines.push("Бассейну: " + rub(pool));
-  if(pays.length){
-    lines.push("", "Оплата принята:");
-    pays.forEach(function(x){ lines.push(x); });
-  }
-  return lines.join("\n");
+  var blocks = sessionsForDate(date)
+    .filter(function(s){ return !s.ghost && !s.off && (s.present.length || (s.pay || []).length); })
+    .map(function(s){ return sessionLines(s).join("\n"); });
+  return blocks.length ? blocks.join("\n\n") : "Тренировок не было.";
 }
 
 /* ---------- modals ---------- */
@@ -2745,8 +2719,8 @@ el("attGuest").onclick = guestModal;
 el("attAdmin").onclick = renderAdmin;
 el("attCopy").onclick = function(){
   var s = currentSession();
-  copyModal("Тренировка " + s.time, fmtShort(s.date) + "\n\n" + sessionText(s) +
-    (s.off ? "" : "\n\nБассейну: " + rub(poolOf(s))), null);
+  copyModal("Тренировка " + s.time,
+    s.off ? "Тренировка отменена." : (sessionLines(s).join("\n") || "Никого не отмечено."), null);
 };
 el("admClose").onclick = function(){ el("admSheet").classList.remove("on"); };
 
