@@ -387,6 +387,19 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .pick button:active{background:var(--accent-soft)}
 .pick .pn{flex:1;min-width:0;font-size:16px;font-weight:600;overflow-wrap:anywhere}
 
+.adminrow{
+  display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--r);
+  padding:10px 14px 10px 13px;min-height:56px;
+}
+.adminrow .lbl{flex:1;min-width:0;font-size:15.5px;font-weight:600;color:var(--muted)}
+.adminrow .amt{font-size:14px;color:var(--faint);white-space:nowrap}
+.adminrow.on{border-color:var(--ochre)}
+.adminrow.on .box{background:var(--ochre);border-color:var(--ochre);color:var(--surface)}
+.adminrow.on .lbl{color:var(--ink);font-weight:700}
+.adminrow.on .amt{color:var(--ochre);font-weight:600}
+.slot-adm{color:var(--ochre);font-weight:700}
+
 .tot-strip{display:flex;gap:10px}
 .tot-box{flex:1;background:var(--surface-2);border:1px solid var(--line);border-radius:11px;padding:9px 11px}
 .tot-box .k{font-size:11.5px;color:var(--muted);font-weight:700;letter-spacing:.05em;text-transform:uppercase}
@@ -516,6 +529,10 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 
     <div class="sect-label">Зарплата</div>
     <div class="card split" id="salaryBox"></div>
+
+    <div class="sect-label" id="adminLabel">Админ</div>
+    <div class="card split" id="adminBox"></div>
+
     <div class="note" id="combinedNote"></div>
 
     <div class="sect-label">Полученное от начальника</div>
@@ -597,6 +614,21 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
       </div>
     </div>
 
+    <div class="sect-label">Админ</div>
+    <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:11px">
+      <div class="setgrid">
+        <div class="field">
+          <label for="sAdminName">Имя</label>
+          <input id="sAdminName" type="text" autocomplete="off" placeholder="Соня">
+        </div>
+        <div class="field">
+          <label for="sAdminFee">За тренировку</label>
+          <input class="mono" id="sAdminFee" type="number" inputmode="numeric">
+        </div>
+      </div>
+      <div class="note">Деньги админа не входят ни в вашу зарплату, ни в бассейн — считаются отдельной графой. Новая ставка действует на отметки с этого момента, уже отмеченные тренировки остаются по прежней.</div>
+    </div>
+
     <div class="sect-label">Цены для родителей</div>
     <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:11px">
       <div class="note">Подставляются кнопкой, когда записываете принятую оплату. Оставьте 0, если цена ещё не известна.</div>
@@ -657,6 +689,11 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
   </div>
   <div class="sheet-body">
     <div class="sheet-inner">
+      <button class="adminrow" id="attAdminRow" type="button">
+        <span class="box">✓</span>
+        <span class="lbl" id="attAdminLbl">Админ на тренировке</span>
+        <span class="amt mono" id="attAdminAmt">500 ₽</span>
+      </button>
       <div class="att" id="attList"></div>
       <div class="btnrow">
         <button class="btn" id="attAddKid" type="button">+ Новенький</button>
@@ -669,6 +706,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
       <div class="tot-strip">
         <div class="tot-box"><div class="k">Пришло</div><div class="v mono" id="attCount">0</div></div>
         <div class="tot-box"><div class="k">Бассейну</div><div class="v mono" id="attPool">0 ₽</div></div>
+        <div class="tot-box" id="attAdminBox" hidden><div class="k" id="attAdminK">Админ</div><div class="v mono" id="attAdminSum">0 ₽</div></div>
       </div>
       <div class="btnrow">
         <button class="btn primary" id="attAdmin" type="button">Показать админу</button>
@@ -737,7 +775,7 @@ function defaults(){
   return {
     v: 1,
     demo: true,
-    settings: { feeGroup:1000, feeIndiv:500, poolChild:400, poolIndiv:900,
+    settings: { feeGroup:1000, feeIndiv:500, poolChild:400, poolIndiv:900, adminFee:500, adminName:"Соня",
                 priceSub:0, priceIndiv:1800, priceOnce:0, priceTrial:0, theme:"auto", bossName:"" },
     schedule: { 0:["10:00","11:00"], 1:[], 2:["17:00","18:00","19:00"], 3:["18:00"],
                 4:["17:00","18:00","19:00"], 5:[], 6:["10:00","11:00"] },
@@ -804,7 +842,7 @@ function save(fromServer){
 /* Цифра под значком рубля — та же, что большая цифра на вкладке денег. */
 function renderNavBal(){
   var b = balance();
-  el("navBal").textContent = shortMoney(b.pool - b.bankGiven - b.cash + b.adj);
+  el("navBal").textContent = shortMoney(b.cashSide);
 }
 
 /* ---------- синхронизация ---------- */
@@ -1015,6 +1053,29 @@ function feeOf(s){
   if(s.off || !s.present.length) return 0;
   return s.type === "group" ? S.settings.feeGroup : S.settings.feeIndiv;
 }
+/* Админ: 500 ₽ за тренировку, где она была. Деньги школы — начальник
+   переводит их тренеру, тренер отдаёт админу. Сумма запоминается в самой
+   тренировке в момент отметки, чтобы смена ставки не переписала историю. */
+function adminRate(){
+  var r = S.settings.adminFee;
+  return (r === undefined || r === null || isNaN(r)) ? 500 : r;
+}
+function adminName(){
+  var n = (S.settings.adminName === undefined || S.settings.adminName === null) ? "Соня" : S.settings.adminName;
+  return String(n).trim() || "Админ";
+}
+function adminOf(s){
+  if(s.off || !s.admin) return 0;
+  return typeof s.admin === "number" ? s.admin : adminRate();
+}
+function adminBetween(from, to){
+  var t = 0;
+  allSessions().forEach(function(s){
+    if(s.date >= from && s.date <= to) t += adminOf(s);
+  });
+  return t;
+}
+
 var PAY_WAYS = { cash: "наличными мне", qr: "по QR начальнику" };
 
 function payOf(s, way){
@@ -1102,12 +1163,13 @@ function allSessions(){
 /* ---------- переводы от начальника ---------- */
 function splitOf(m){
   if(m.kind === "payout"){
-    var sal = Math.min(m.salary || 0, m.amount);
-    return { salary: sal, bank: m.amount - sal };
+    var sal = Math.max(0, Math.min(m.salary || 0, m.amount));
+    var adm = Math.max(0, Math.min(m.admin || 0, m.amount - sal));
+    return { salary: sal, admin: adm, bank: m.amount - sal - adm };
   }
-  if(m.kind === "salary") return { salary: m.amount, bank: 0 };
-  if(m.kind === "advance") return { salary: 0, bank: m.amount };
-  return { salary: 0, bank: 0 };
+  if(m.kind === "salary") return { salary: m.amount, admin: 0, bank: 0 };
+  if(m.kind === "advance") return { salary: 0, admin: 0, bank: m.amount };
+  return { salary: 0, admin: 0, bank: 0 };
 }
 function lastPayoutBefore(date, exceptId){
   var best = null;
@@ -1157,9 +1219,10 @@ function feesBetween(from, to){
 /* ---------- balance ---------- */
 function balance(){
   var all = allSessions();
-  var fees = 0, pool = 0, cash = 0, i;
+  var fees = 0, pool = 0, cash = 0, admin = 0, i;
   for(i=0;i<all.length;i++){
     if(all[i].off) continue;
+    admin += adminOf(all[i]);
     if(!all[i].present.length && !(all[i].pay||[]).length) continue;
     fees += feeOf(all[i]);
     pool += poolOf(all[i]);
@@ -1170,17 +1233,24 @@ function balance(){
     if(all[i].off) continue;
     qr += payOf(all[i], "qr");
   }
-  var got = 0, adj = 0, salaryPaid = 0, bankGiven = 0;
+  var got = 0, adj = 0, salaryPaid = 0, bankGiven = 0, adminPaid = 0;
   for(i=0;i<S.money.length;i++){
     var m = S.money[i];
     if(m.kind === "adjust"){ adj += m.amount; continue; }
     got += m.amount;
     var sp = splitOf(m);
-    salaryPaid += sp.salary; bankGiven += sp.bank;
+    salaryPaid += sp.salary; adminPaid += sp.admin; bankGiven += sp.bank;
   }
-  return { fees:fees, pool:pool, cash:cash, qr:qr, got:got, adj:adj,
-           salaryPaid:salaryPaid, bankGiven:bankGiven,
-           total: fees + pool - cash - got + adj };
+  /* Три графы, которые не смешиваются:
+     касса    — бассейн и наличка родителей против банковской части переводов
+     зарплата — её заработок против выплаченного
+     админ    — начисленное Соне против полученного для неё
+     cashSide + salaryOwed + adminOwed === total */
+  var cashSide = pool - bankGiven - cash + adj;
+  return { fees:fees, pool:pool, admin:admin, cash:cash, qr:qr, got:got, adj:adj,
+           salaryPaid:salaryPaid, adminPaid:adminPaid, bankGiven:bankGiven,
+           cashSide:cashSide, salaryOwed: fees - salaryPaid, adminOwed: admin - adminPaid,
+           total: fees + pool + admin - cash - got + adj };
 }
 
 /* ---------- render: header ---------- */
@@ -1224,10 +1294,10 @@ function renderDay(){
     e.textContent = "В этот день тренировок по расписанию нет.";
     wrap.appendChild(e);
   }
-  var dayFee = 0, dayPool = 0, dayKids = 0, dayCash = 0, dayQr = 0;
+  var dayFee = 0, dayPool = 0, dayKids = 0, dayCash = 0, dayQr = 0, dayAdmin = 0;
 
   list.forEach(function(s){
-    var marked = !s.ghost && (s.present.length > 0 || s.off || s.type === "indiv");
+    var marked = !s.ghost && (s.present.length > 0 || s.off || s.type === "indiv" || !!s.admin);
     var btn = document.createElement("button");
     btn.type = "button";
     btn.className = "slot" + (s.off ? " off" : marked ? (s.type==="indiv" ? " indiv done" : " done") : "");
@@ -1237,6 +1307,7 @@ function renderDay(){
     else if(!marked) status = '<span class="slot-status pending">не отмечено</span>';
     else if(s.type === "indiv") status = '<span class="slot-status">' + (s.present.length ? escapeHtml(kidName(s.present[0])) : "никого") + '</span>';
     else status = '<span class="slot-status"><b>' + s.present.length + '</b> из ' + kidsForSlot(s.time).length + '</span>';
+    if(!s.off && s.admin) status = status.slice(0, -7) + ' · <span class="slot-adm">' + escapeHtml(adminName()) + '</span></span>';
 
     btn.innerHTML =
       '<span class="slot-bar"></span>' +
@@ -1254,7 +1325,7 @@ function renderDay(){
     wrap.appendChild(btn);
 
     if(!s.off && marked){
-      dayFee += feeOf(s); dayPool += poolOf(s);
+      dayFee += feeOf(s); dayPool += poolOf(s); dayAdmin += adminOf(s);
       dayKids += s.present.length;
       dayCash += payOf(s, "cash"); dayQr += payOf(s, "qr");
     }
@@ -1264,6 +1335,7 @@ function renderDay(){
   t.innerHTML =
     row("Ваша зарплата", money(dayFee)) +
     row("Бассейну за " + dayKids + " " + plural(dayKids, "ребёнка","детей","детей"), money(dayPool)) +
+    (dayAdmin ? row(escapeHtml(adminName()) + " (админ)", money(dayAdmin)) : "") +
     (dayCash ? row("Наличными вам", money(dayCash)) : "") +
     (dayQr ? row("По QR начальнику", money(dayQr)) : "") +
     '<div class="dsrow tot"><span>Ушло из ваших рук</span><b class="mono">' + money(dayPool) + '</b></div>';
@@ -1301,7 +1373,7 @@ function renderMoney(){
   /* Два независимых счёта, чтобы не смешивать чужие деньги со своим заработком:
      касса — что прошло через руки, зарплата — что начислено и выплачено.
      cashSide + salaryOwed === b.total (сводная строка внизу). */
-  var cashSide = b.pool - b.bankGiven - b.cash + b.adj;
+  var cashSide = b.cashSide;
   var salaryOwed = b.fees - b.salaryPaid;
 
   var box = el("balBox");
@@ -1310,7 +1382,7 @@ function renderMoney(){
     : cashSide < 0 ? "Вы должны " + boss.toLowerCase().replace(/^начальник$/, "начальнику")
     : "По деньгам сошлось";
   el("balVal").textContent = money(Math.abs(cashSide));
-  el("balHint").textContent = "Только чужие деньги: бассейн и наличные от родителей. Зарплата — ниже, отдельно.";
+  el("balHint").textContent = "Только бассейн и наличные от родителей. Ваша зарплата и деньги админа — ниже, отдельно.";
 
   el("ledger").innerHTML =
     led("plus","Внесено за бассейн", "по числу пришедших", b.pool) +
@@ -1325,8 +1397,21 @@ function renderMoney(){
     splitRow(salaryOwed > 0 ? "Вам должны зарплату" : salaryOwed < 0 ? "Зарплату переплатили" : "Зарплата закрыта",
       "начислено минус выплачено", salaryOwed, " total");
 
-  var both = cashSide + salaryOwed;
-  el("combinedNote").textContent = "Если зачесть зарплату в счёт этих денег: " +
+  var an = adminName();
+  var adminCount = allSessions().filter(function(x){ return adminOf(x) > 0; }).length;
+  var showAdmin = b.admin > 0 || b.adminPaid > 0;
+  el("adminLabel").hidden = !showAdmin;
+  el("adminBox").hidden = !showAdmin;
+  el("adminLabel").textContent = an + " · админ";
+  el("adminBox").innerHTML = !showAdmin ? "" :
+    splitRow("Начислено", adminCount + " " + plural(adminCount, "тренировка", "тренировки", "тренировок") +
+      " × " + money(adminRate()), b.admin) +
+    splitRow("Получено от начальника", b.adminPaid ? "часть переводов для админа" : "пока ничего не переводил", -b.adminPaid) +
+    splitRow(b.adminOwed > 0 ? "Начальник ещё не перевёл" : b.adminOwed < 0 ? "Перевёл больше начисленного" : "Всё переведено",
+      "начислено минус полученное", b.adminOwed, " total");
+
+  var both = cashSide + salaryOwed + b.adminOwed;
+  el("combinedNote").textContent = "Если свести всё вместе — зарплату" + (showAdmin ? " и деньги админа" : "") + ": " +
     (both > 0 ? boss + " должен вам " + money(both)
      : both < 0 ? "вы должны " + money(-both)
      : "выходит ровно в ноль");
@@ -1346,6 +1431,7 @@ function renderMoney(){
       var detail = m.kind === "payout"
         ? "зарплата " + money(sp.salary) +
           (m.salFrom && m.salTo ? " за " + fmtShort(m.salFrom) + "—" + fmtShort(m.salTo) : "") +
+          (sp.admin ? ", " + escapeHtml(adminName()) + " " + money(sp.admin) : "") +
           ", на бассейн " + money(sp.bank)
         : (m.note ? escapeHtml(m.note) : "");
       d.innerHTML =
@@ -1422,6 +1508,8 @@ function renderSettings(){
   el("sFeeIndiv").value = S.settings.feeIndiv;
   el("sPoolChild").value = S.settings.poolChild;
   el("sPoolIndiv").value = S.settings.poolIndiv;
+  el("sAdminFee").value = adminRate();
+  el("sAdminName").value = adminName();
   el("sPriceSub").value = S.settings.priceSub || 0;
   el("sPriceIndiv").value = S.settings.priceIndiv || 0;
   el("sPriceOnce").value = S.settings.priceOnce || 0;
@@ -1678,6 +1766,17 @@ function renderAtt(){
 
   el("attCount").textContent = s.present.length;
   el("attPool").textContent = money(poolOf(s));
+
+  var adm = adminOf(s);
+  var row = el("attAdminRow");
+  row.hidden = !!s.off;
+  row.classList.toggle("on", !!s.admin);
+  row.setAttribute("aria-pressed", s.admin ? "true" : "false");
+  el("attAdminAmt").textContent = money(s.admin ? adm : adminRate());
+  el("attAdminLbl").textContent = adminName() + " на тренировке";
+  el("attAdminK").textContent = adminName();
+  el("attAdminBox").hidden = !adm;
+  el("attAdminSum").textContent = money(adm);
 }
 
 function byName(a, b){ return fullName(a).localeCompare(fullName(b), "ru"); }
@@ -2136,11 +2235,15 @@ function moneyModal(edit){
         '<div class="note" id="mFees"></div>' +
         '<div class="field"><label for="mSal">Из них ваша зарплата, ₽</label>' +
           '<input class="mono" id="mSal" type="number" inputmode="numeric"></div>' +
+        '<div class="field"><label for="mAdm">Из них ' + escapeHtml(adminName()) + ' (админ), ₽</label>' +
+          '<input class="mono" id="mAdm" type="number" inputmode="numeric"></div>' +
         '<div class="note" id="mBank"></div>';
 
       var fromEl = c.querySelector("#mFrom");
       var toEl = c.querySelector("#mTo");
       var salEl = c.querySelector("#mSal");
+      var admEl = c.querySelector("#mAdm");
+      var adminEdited = false;
       var feesEl = c.querySelector("#mFees");
       var bankEl = c.querySelector("#mBank");
 
@@ -2148,7 +2251,9 @@ function moneyModal(edit){
         fromEl.value = edit.salFrom || nextPeriodStart(edit.date, edit.id);
         toEl.value = edit.salTo || edit.date;
         salEl.value = edit.salary || 0;
+        admEl.value = edit.admin || 0;
         salaryEdited = true;
+        adminEdited = true;
       } else {
         toEl.value = dateEl.value;
         fromEl.value = nextPeriodStart(dateEl.value, isEdit ? edit.id : null);
@@ -2170,14 +2275,18 @@ function moneyModal(edit){
         if(f.ind) parts.push(f.ind + " " + plural(f.ind,"индив.","индив.","индив."));
         feesEl.innerHTML = "За этот период вы наработали <b>" + money(f.total) + "</b>" +
           (parts.length ? " — " + parts.join(", ") : " — тренировок не было");
+        var adm = adminBetween(fromEl.value, toEl.value);
+        if(adm) feesEl.innerHTML += "<br>" + escapeHtml(adminName()) + " (админ) за этот же период: <b>" + money(adm) + "</b>";
         if(!salaryEdited) salEl.value = f.total;
+        if(!adminEdited) admEl.value = adm;
       }
       function refreshBank(){
         var total = parseInt(amtEl.value, 10) || 0;
         var sal = parseInt(salEl.value, 10) || 0;
-        var bank = total - sal;
+        var adm = parseInt(admEl.value, 10) || 0;
+        var bank = total - sal - adm;
         bankEl.innerHTML = bank < 0
-          ? "Зарплата больше перевода на <b>" + money(-bank) + "</b> — проверьте суммы."
+          ? "Зарплата и админ вместе больше перевода на <b>" + money(-bank) + "</b> — проверьте суммы."
           : "Останется банка на бассейн: <b>" + money(bank) + "</b>";
       }
       function refreshAll(){ refreshFees(); refreshBank(); }
@@ -2197,8 +2306,9 @@ function moneyModal(edit){
 
       amtEl.oninput = refreshBank;
       salEl.oninput = function(){ salaryEdited = true; refreshBank(); };
-      fromEl.onchange = function(){ salaryEdited = false; refreshAll(); };
-      toEl.onchange = function(){ salaryEdited = false; refreshAll(); };
+      admEl.oninput = function(){ adminEdited = true; refreshBank(); };
+      fromEl.onchange = function(){ salaryEdited = false; adminEdited = false; refreshAll(); };
+      toEl.onchange = function(){ salaryEdited = false; adminEdited = false; refreshAll(); };
       dateEl.onchange = function(){
         if(!salaryEdited){
           toEl.value = dateEl.value;
@@ -2233,6 +2343,7 @@ function moneyModal(edit){
         };
         if(kind === "payout"){
           rec.salary = Math.max(0, Math.min(parseInt(salEl.value, 10) || 0, v));
+          rec.admin = Math.max(0, Math.min(parseInt(admEl.value, 10) || 0, v - rec.salary));
           rec.salFrom = fromEl.value || "";
           rec.salTo = toEl.value || rec.date;
         }
@@ -2481,7 +2592,7 @@ function csvVisits(){
   return rows;
 }
 function csvMoney(){
-  var rows = [["Дата","Что","Сумма","Из них зарплата","На бассейн","Зарплата с","по","Заметка"]];
+  var rows = [["Дата","Что","Сумма","Из них зарплата",adminName() + " (админ)","На бассейн","Зарплата с","по","Заметка"]];
   S.money.slice().sort(function(a, b){ return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; })
     .forEach(function(m){
       var sp = splitOf(m);
@@ -2489,6 +2600,7 @@ function csvMoney(){
                 : m.kind === "salary" ? "зарплата" : "ручная правка";
       rows.push([m.date, label, m.amount,
         m.kind === "adjust" ? "" : sp.salary,
+        m.kind === "adjust" ? "" : sp.admin,
         m.kind === "adjust" ? "" : sp.bank,
         m.salFrom || "", m.salTo || "", m.note || ""]);
     });
@@ -2498,17 +2610,18 @@ function csvDays(){
   var byDay = {};
   allSessions().forEach(function(sn){
     if(sn.off) return;
-    var r = byDay[sn.date] || (byDay[sn.date] = { g:0, ind:0, kids:0, fee:0, pool:0, cash:0, qr:0 });
+    var r = byDay[sn.date] || (byDay[sn.date] = { g:0, ind:0, kids:0, fee:0, pool:0, admin:0, cash:0, qr:0 });
+    r.admin += adminOf(sn);
     if(!sn.present.length && !(sn.pay || []).length) return;
     if(sn.type === "group") r.g++; else r.ind++;
     r.kids += sn.present.length;
     r.fee += feeOf(sn); r.pool += poolOf(sn);
     r.cash += payOf(sn, "cash"); r.qr += payOf(sn, "qr");
   });
-  var rows = [["Дата","День недели","Групповых","Индивидуальных","Детей","Ваша зарплата","Бассейну","Наличными вам","По QR начальнику"]];
+  var rows = [["Дата","День недели","Групповых","Индивидуальных","Детей","Ваша зарплата","Бассейну",adminName() + " (админ)","Наличными вам","По QR начальнику"]];
   Object.keys(byDay).sort().forEach(function(dt){
     var r = byDay[dt], d = parseIso(dt);
-    rows.push([dt, DAYS[d.getDay()], r.g, r.ind, r.kids, r.fee, r.pool, r.cash, r.qr]);
+    rows.push([dt, DAYS[d.getDay()], r.g, r.ind, r.kids, r.fee, r.pool, r.admin, r.cash, r.qr]);
   });
   return rows;
 }
@@ -2589,9 +2702,11 @@ function mondayOf(dateStr){
   return iso(d);
 }
 function statsFor(from, to){
-  var st = { fees:0, pool:0, cash:0, qr:0, got:0, g:0, ind:0, kids:0, days:{} };
+  var st = { fees:0, pool:0, admin:0, adminN:0, cash:0, qr:0, got:0, g:0, ind:0, kids:0, days:{} };
   allSessions().forEach(function(s){
     if(s.date < from || s.date > to) return;
+    var a = adminOf(s);
+    if(a){ st.admin += a; st.adminN++; }
     if(s.off || !s.present.length) return;
     st.fees += feeOf(s); st.pool += poolOf(s);
     st.cash += payOf(s, "cash"); st.qr += payOf(s, "qr");
@@ -2613,11 +2728,13 @@ function summaryLines(st){
     "",
     "Ваша зарплата: " + money(st.fees),
     "Бассейну внесено: " + money(st.pool),
+    adminName() + " (админ): " + money(st.admin) + (st.adminN ? " (" + st.adminN + " " +
+      plural(st.adminN, "тренировка", "тренировки", "тренировок") + ")" : ""),
     "Наличными от родителей: " + money(st.cash),
     "Оплачено родителями по QR: " + money(st.qr),
     "Получено от начальника: " + money(st.got),
     "",
-    "За период начальник должен: " + money(st.fees + st.pool - st.cash - st.got)
+    "За период начальник должен: " + money(st.fees + st.pool + st.admin - st.cash - st.got)
   ];
 }
 
@@ -2708,6 +2825,10 @@ el("sBoss").onchange = function(){
   S.settings.bossName = el("sBoss").value.trim();
   save();
 };
+el("sAdminName").onchange = function(){
+  S.settings.adminName = el("sAdminName").value.trim();
+  save(); renderAll();
+};
 el("btnExport").onclick = exportModal;
 el("btnBackup").onclick = backupModal;
 el("btnRestore").onclick = restoreModal;
@@ -2717,6 +2838,13 @@ el("attMenu").onclick = sessionMenu;
 el("attAddKid").onclick = function(){ kidModal(null); };
 el("attGuest").onclick = guestModal;
 el("attAdmin").onclick = renderAdmin;
+el("attAdminRow").onclick = function(){
+  var s = currentSession();
+  if(!s || s.off) return;
+  touched(s);
+  if(s.admin) delete s.admin; else s.admin = adminRate();
+  save(); renderAtt(); renderDay();
+};
 el("attCopy").onclick = function(){
   var s = currentSession();
   copyModal("Тренировка " + s.time,
@@ -2726,8 +2854,9 @@ el("admClose").onclick = function(){ el("admSheet").classList.remove("on"); };
 
 el("modal").onclick = function(e){ if(e.target === el("modal")) closeModal(); };
 
-["sFeeGroup","sFeeIndiv","sPoolChild","sPoolIndiv","sPriceSub","sPriceIndiv","sPriceOnce","sPriceTrial"].forEach(function(id){
+["sFeeGroup","sFeeIndiv","sPoolChild","sPoolIndiv","sAdminFee","sPriceSub","sPriceIndiv","sPriceOnce","sPriceTrial"].forEach(function(id){
   var map = { sFeeGroup:"feeGroup", sFeeIndiv:"feeIndiv", sPoolChild:"poolChild", sPoolIndiv:"poolIndiv",
+              sAdminFee:"adminFee",
               sPriceSub:"priceSub", sPriceIndiv:"priceIndiv",
               sPriceOnce:"priceOnce", sPriceTrial:"priceTrial" };
   el(id).onchange = function(){
