@@ -2192,6 +2192,7 @@ function moneyModal(edit){
     '<div class="modal-h">' + (isEdit ? "Изменить запись" : "Деньги от начальника") + '</div>' +
     '<div class="field"><label>Что это</label><div class="seg" id="mKind">' +
       '<button type="button" data-k="payout">Перевод</button>' +
+      '<button type="button" data-k="advance">На бассейн</button>' +
       '<button type="button" data-k="adjust">Правка</button>' +
     '</div></div>' +
     '<div class="field"><label for="mAmt">Сколько скинул, ₽</label>' +
@@ -2208,10 +2209,14 @@ function moneyModal(edit){
     (isEdit ? '<button class="btn danger" id="mDel" type="button">Удалить запись</button>' : ''),
     function(c){
       var hints = {
-        payout: "Одна сумма, которую скинул начальник. Из неё вычитается ваша зарплата за указанный период, остальное — банк на оплату бассейна.",
+        payout: "Одна сумма, которую скинул начальник. Из неё вычитается ваша зарплата и деньги админа за указанный период, остальное — банк на оплату бассейна.",
+        advance: "Перевод только на оплату бассейна: зарплата и деньги админа в нём не считаются, и период следующей зарплаты он не сдвигает.",
         adjust: "Ручная правка баланса. Со знаком минус, если долг начальника надо уменьшить."
       };
-      var kind = isEdit ? (edit.kind === "adjust" ? "adjust" : "payout") : "payout";
+      var kind = !isEdit ? "payout"
+        : edit.kind === "adjust" ? "adjust"
+        : edit.kind === "advance" ? "advance"
+        : "payout";
       var amtEl = c.querySelector("#mAmt");
       var dateEl = c.querySelector("#mDate");
       var noteEl = c.querySelector("#mNote");
