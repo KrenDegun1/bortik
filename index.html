@@ -600,6 +600,26 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
       </div>
     </div>
 
+    <div class="sect-label">Тренировка без детей</div>
+    <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:11px">
+      <div class="field">
+        <label for="sSoloName">Название</label>
+        <input id="sSoloName" type="text" autocomplete="off" placeholder="Кот в шляпе">
+      </div>
+      <div class="field"><label>Дни</label><div class="daypick" id="sSoloDays"></div></div>
+      <div class="setgrid">
+        <div class="field">
+          <label for="sSoloTime">Время</label>
+          <input class="mono" id="sSoloTime" type="text" placeholder="14:30">
+        </div>
+        <div class="field">
+          <label for="sFeeSolo">За тренировку</label>
+          <input class="mono" id="sFeeSolo" type="number" inputmode="numeric">
+        </div>
+      </div>
+      <div class="note">Детей не отмечаете — только что тренировку отвели. Сумма идёт в вашу зарплату. Пока не указано время, на вкладке «День» её не видно. Новая сумма действует на отметки с этого момента.</div>
+    </div>
+
     <div class="sect-label">Сколько уходит бассейну</div>
     <div class="card" style="padding:14px">
       <div class="setgrid">
@@ -776,7 +796,8 @@ function defaults(){
     v: 1,
     demo: true,
     settings: { feeGroup:1000, feeIndiv:500, poolChild:400, poolIndiv:900, adminFee:500, adminName:"Соня",
-                priceSub:0, priceIndiv:1800, priceOnce:0, priceTrial:0, theme:"auto", bossName:"" },
+                priceSub:0, priceIndiv:1800, priceOnce:0, priceTrial:0, theme:"auto", bossName:"",
+                feeSolo:1200, soloDays:[1,3], soloTime:"14:30", soloName:"Кот в шляпе" },
     schedule: { 0:["10:00","11:00"], 1:[], 2:["17:00","18:00","19:00"], 3:["18:00"],
                 4:["17:00","18:00","19:00"], 5:[], 6:["10:00","11:00"] },
     kids: [],
@@ -1028,8 +1049,13 @@ function sessionsForDate(date){
   for(k in S.sessions){
     if(!S.sessions.hasOwnProperty(k)) continue;
     var s = S.sessions[k];
+    if(s.type === "solo") continue;
     if(s.date === date && !seen[s.time]) out.push(s);
   }
+  var solo = S.sessions[soloKey(date)];
+  if(solo) out.push(solo);
+  else if(soloOnDay(d))
+    out.push({ date:date, time:S.settings.soloTime, type:"solo", present:[], pay:[], off:false, ghost:true });
   out.sort(function(a,b){ return a.time < b.time ? -1 : a.time > b.time ? 1 : 0; });
   return out;
 }
@@ -1050,6 +1076,7 @@ function poolOf(s){
   return s.type === "group" ? S.settings.poolChild * s.present.length : S.settings.poolIndiv;
 }
 function feeOf(s){
+  if(s.type === "solo") return s.off ? 0 : (typeof s.fee === "number" ? s.fee : soloRate());
   if(s.off || !s.present.length) return 0;
   return s.type === "group" ? S.settings.feeGroup : S.settings.feeIndiv;
 }
@@ -1063,6 +1090,28 @@ function adminRate(){
 function adminName(){
   var n = (S.settings.adminName === undefined || S.settings.adminName === null) ? "Соня" : S.settings.adminName;
   return String(n).trim() || "Админ";
+}
+/* Тренировка без детей ("Кот в шляпе", пн и ср 14:30): детей не отмечают,
+   только факт "отвела". Своя ставка, её платит начальник вместе с зарплатой.
+   Отметка — отдельная запись "дата|solo", чтобы не столкнуться с группой
+   в то же время. Ставка запоминается в отметке, как у админа. */
+function soloRate(){
+  var r = S.settings.feeSolo;
+  return (r === undefined || r === null || isNaN(r)) ? 1200 : r;
+}
+function soloName(){
+  var n = S.settings.soloName;
+  return (n === undefined || n === null || !String(n).trim()) ? "без детей" : String(n).trim();
+}
+function soloCount(n){ return n + ' "' + soloName() + '"'; }
+function soloKey(date){ return date + "|solo"; }
+function soloOnDay(d){
+  return !!S.settings.soloTime && (S.settings.soloDays || []).indexOf(d) >= 0;
+}
+/* тренировка состоялась: отмечены дети или это "без детей" */
+function held(s){ return !s.off && (s.present.length > 0 || s.type === "solo"); }
+function typeLabel(s){
+  return s.type === "solo" ? soloName() : s.type === "indiv" ? "индивидуальная" : "группа";
 }
 function adminOf(s){
   if(s.off || !s.admin) return 0;
@@ -1151,6 +1200,11 @@ function migrate(st){
     if(!Array.isArray(k.slots)) k.slots = k.slot ? [k.slot] : [];
     if("slot" in k) delete k.slot;
   });
+  var se = st.settings || (st.settings = {});
+  if(typeof se.feeSolo !== "number") se.feeSolo = 1200;
+  if(!Array.isArray(se.soloDays)) se.soloDays = [1,3];
+  if(typeof se.soloTime !== "string") se.soloTime = "14:30";
+  if(typeof se.soloName !== "string") se.soloName = "Кот в шляпе";
   return st;
 }
 
@@ -1200,20 +1254,20 @@ function nextPeriodStart(to, exceptId){
 function firstSessionDate(){
   var d = null;
   allSessions().forEach(function(s){
-    if(s.off || !s.present.length) return;
+    if(!held(s)) return;
     if(!d || s.date < d) d = s.date;
   });
   return d;
 }
 function feesBetween(from, to){
-  var t = 0, g = 0, ind = 0;
+  var t = 0, g = 0, ind = 0, solo = 0;
   allSessions().forEach(function(s){
-    if(s.off || !s.present.length) return;
+    if(!held(s)) return;
     if(s.date < from || s.date > to) return;
     t += feeOf(s);
-    if(s.type === "group") g++; else ind++;
+    if(s.type === "group") g++; else if(s.type === "solo") solo++; else ind++;
   });
-  return { total: t, g: g, ind: ind };
+  return { total: t, g: g, ind: ind, solo: solo };
 }
 
 /* ---------- balance ---------- */
@@ -1223,7 +1277,7 @@ function balance(){
   for(i=0;i<all.length;i++){
     if(all[i].off) continue;
     admin += adminOf(all[i]);
-    if(!all[i].present.length && !(all[i].pay||[]).length) continue;
+    if(!all[i].present.length && !(all[i].pay||[]).length && all[i].type !== "solo") continue;
     fees += feeOf(all[i]);
     pool += poolOf(all[i]);
     cash += payOf(all[i], "cash");
@@ -1297,6 +1351,11 @@ function renderDay(){
   var dayFee = 0, dayPool = 0, dayKids = 0, dayCash = 0, dayQr = 0, dayAdmin = 0;
 
   list.forEach(function(s){
+    if(s.type === "solo"){
+      wrap.appendChild(soloSlot(s));
+      if(!s.ghost) dayFee += feeOf(s);
+      return;
+    }
     var marked = !s.ghost && (s.present.length > 0 || s.off || s.type === "indiv" || !!s.admin);
     var btn = document.createElement("button");
     btn.type = "button";
@@ -1341,6 +1400,39 @@ function renderDay(){
     '<div class="dsrow tot"><span>Ушло из ваших рук</span><b class="mono">' + money(dayPool) + '</b></div>';
 
   renderNavBal();
+}
+
+function soloSlot(s){
+  var btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "slot solo" + (s.ghost ? "" : " done");
+  btn.innerHTML =
+    '<span class="slot-bar"></span>' +
+    '<span class="slot-body">' +
+      '<span class="slot-line"><span class="slot-time mono">' + s.time + '</span>' +
+      '<span class="slot-kind">' + escapeHtml(soloName()) + '</span></span>' +
+      (s.ghost ? '<span class="slot-status pending">не отмечено</span>'
+               : '<span class="slot-status"><b>отвела</b></span>') +
+    '</span>' +
+    '<span class="slot-right">' +
+      (s.ghost ? '' : '<span class="slot-sum mono">' + money(feeOf(s)) + '</span>') +
+    '</span>';
+  btn.onclick = function(){
+    if(s.ghost){
+      S.sessions[soloKey(s.date)] = { date:s.date, time:s.time, type:"solo", present:[], pay:[], off:false, fee:soloRate() };
+      save(); renderDay();
+      return;
+    }
+    confirmModal("Снять отметку",
+      "Тренировка \"" + escapeHtml(soloName()) + "\" " + s.time + " больше не будет считаться отведённой, " +
+      money(feeOf(s)) + " уйдут из зарплаты.",
+      "Снять",
+      function(){
+        delete S.sessions[soloKey(s.date)];
+        save(); renderDay();
+      });
+  };
+  return btn;
 }
 
 function row(k,v){
@@ -1462,13 +1554,15 @@ function splitRow(title, sub, value, extra){
 }
 
 function countSess(){
-  var all = allSessions(), g = 0, i = 0, x;
+  var all = allSessions(), g = 0, i = 0, so = 0, x;
   for(x=0;x<all.length;x++){
     if(all[x].off) continue;
     if(all[x].type === "group"){ if(all[x].present.length) g++; }
+    else if(all[x].type === "solo") so++;
     else i++;
   }
-  return g + " " + plural(g,"групповая","групповых","групповых") + ", " + i + " " + plural(i,"индив.","индив.","индив.");
+  return g + " " + plural(g,"групповая","групповых","групповых") + ", " + i + " " + plural(i,"индив.","индив.","индив.") +
+    (so ? ", " + escapeHtml(soloCount(so)) : "");
 }
 function led(cls,title,sub,amount){
   var sign = cls === "plus" ? "+" : cls === "minus" ? "−" : "·";
@@ -1516,6 +1610,25 @@ function renderSettings(){
   el("sPriceTrial").value = S.settings.priceTrial || 0;
 
   el("sBoss").value = S.settings.bossName || "";
+
+  el("sSoloName").value = S.settings.soloName || "";
+  el("sSoloTime").value = S.settings.soloTime || "";
+  el("sFeeSolo").value = soloRate();
+  var sd = el("sSoloDays");
+  sd.innerHTML = "";
+  WEEK_ORDER.forEach(function(d){
+    var b = document.createElement("button");
+    b.type = "button"; b.textContent = DAYS_SHORT[d];
+    if((S.settings.soloDays || []).indexOf(d) >= 0) b.className = "on";
+    b.onclick = function(){
+      var days = (S.settings.soloDays || []).slice(), i = days.indexOf(d);
+      if(i >= 0) days.splice(i, 1); else days.push(d);
+      S.settings.soloDays = days;
+      b.classList.toggle("on", i < 0);
+      save(); renderDay();
+    };
+    sd.appendChild(b);
+  });
 
   renderSyncBox();
 
@@ -1586,13 +1699,16 @@ function renderWeek(){
   ov.innerHTML = "";
   WEEK_ORDER.forEach(function(d){
     var list = (S.schedule[d] || []).slice().sort();
+    var solo = soloOnDay(d);
+    var times = solo ? list.concat([S.settings.soloTime]).sort() : list;
     var r = document.createElement("div");
-    r.className = "wk-row" + (list.length ? "" : " free");
+    r.className = "wk-row" + (times.length ? "" : " free");
     r.innerHTML = '<div class="wd"></div><div class="wt mono"></div><div class="wn"></div>';
     r.querySelector(".wd").textContent = DAYS_SHORT[d];
-    r.querySelector(".wt").textContent = list.length ? list.join("   ") : "выходной";
-    r.querySelector(".wn").textContent = list.length
-      ? list.length + " " + plural(list.length, "группа", "группы", "групп") : "";
+    r.querySelector(".wt").textContent = times.length ? times.join("   ") : "выходной";
+    r.querySelector(".wn").textContent =
+      (list.length ? list.length + " " + plural(list.length, "группа", "группы", "групп") : "") +
+      (solo ? (list.length ? " + " : "") + soloName() : "");
     ov.appendChild(r);
   });
 }
@@ -1897,7 +2013,9 @@ function dayReport(date){
   var blocks = sessionsForDate(date)
     .filter(function(s){ return !s.ghost && !s.off && (s.present.length || (s.pay || []).length); })
     .map(function(s){ return sessionLines(s).join("\n"); });
-  return blocks.length ? blocks.join("\n\n") : "Тренировок не было.";
+  if(blocks.length) return blocks.join("\n\n");
+  var solo = S.sessions[soloKey(date)];
+  return solo && held(solo) ? "Тренировка \"" + soloName() + "\" " + solo.time + " отведена." : "Тренировок не было.";
 }
 
 /* ---------- modals ---------- */
@@ -2278,6 +2396,7 @@ function moneyModal(edit){
         var parts = [];
         if(f.g) parts.push(f.g + " " + plural(f.g,"групповая","групповых","групповых"));
         if(f.ind) parts.push(f.ind + " " + plural(f.ind,"индив.","индив.","индив."));
+        if(f.solo) parts.push(escapeHtml(soloCount(f.solo)));
         feesEl.innerHTML = "За этот период вы наработали <b>" + money(f.total) + "</b>" +
           (parts.length ? " — " + parts.join(", ") : " — тренировок не было");
         var adm = adminBetween(fromEl.value, toEl.value);
@@ -2577,7 +2696,7 @@ function csvVisits(){
       return;
     }
     if(!sn.present.length){
-      rows.push([sn.date, DAYS[d.getDay()], sn.time, sn.type === "indiv" ? "индивидуальная" : "группа", "", "", 0, "", "", ""]);
+      rows.push([sn.date, DAYS[d.getDay()], sn.time, typeLabel(sn), "", "", 0, "", "", ""]);
       return;
     }
     sn.present.forEach(function(id){
@@ -2615,18 +2734,18 @@ function csvDays(){
   var byDay = {};
   allSessions().forEach(function(sn){
     if(sn.off) return;
-    var r = byDay[sn.date] || (byDay[sn.date] = { g:0, ind:0, kids:0, fee:0, pool:0, admin:0, cash:0, qr:0 });
+    var r = byDay[sn.date] || (byDay[sn.date] = { g:0, ind:0, solo:0, kids:0, fee:0, pool:0, admin:0, cash:0, qr:0 });
     r.admin += adminOf(sn);
-    if(!sn.present.length && !(sn.pay || []).length) return;
-    if(sn.type === "group") r.g++; else r.ind++;
+    if(!sn.present.length && !(sn.pay || []).length && sn.type !== "solo") return;
+    if(sn.type === "group") r.g++; else if(sn.type === "solo") r.solo++; else r.ind++;
     r.kids += sn.present.length;
     r.fee += feeOf(sn); r.pool += poolOf(sn);
     r.cash += payOf(sn, "cash"); r.qr += payOf(sn, "qr");
   });
-  var rows = [["Дата","День недели","Групповых","Индивидуальных","Детей","Ваша зарплата","Бассейну",adminName() + " (админ)","Наличными вам","По QR начальнику"]];
+  var rows = [["Дата","День недели","Групповых","Индивидуальных",soloName(),"Детей","Ваша зарплата","Бассейну",adminName() + " (админ)","Наличными вам","По QR начальнику"]];
   Object.keys(byDay).sort().forEach(function(dt){
     var r = byDay[dt], d = parseIso(dt);
-    rows.push([dt, DAYS[d.getDay()], r.g, r.ind, r.kids, r.fee, r.pool, r.admin, r.cash, r.qr]);
+    rows.push([dt, DAYS[d.getDay()], r.g, r.ind, r.solo, r.kids, r.fee, r.pool, r.admin, r.cash, r.qr]);
   });
   return rows;
 }
@@ -2707,16 +2826,16 @@ function mondayOf(dateStr){
   return iso(d);
 }
 function statsFor(from, to){
-  var st = { fees:0, pool:0, admin:0, adminN:0, cash:0, qr:0, got:0, g:0, ind:0, kids:0, days:{} };
+  var st = { fees:0, pool:0, admin:0, adminN:0, cash:0, qr:0, got:0, g:0, ind:0, solo:0, kids:0, days:{} };
   allSessions().forEach(function(s){
     if(s.date < from || s.date > to) return;
     var a = adminOf(s);
     if(a){ st.admin += a; st.adminN++; }
-    if(s.off || !s.present.length) return;
+    if(!held(s)) return;
     st.fees += feeOf(s); st.pool += poolOf(s);
     st.cash += payOf(s, "cash"); st.qr += payOf(s, "qr");
     st.kids += s.present.length;
-    if(s.type === "group") st.g++; else st.ind++;
+    if(s.type === "group") st.g++; else if(s.type === "solo") st.solo++; else st.ind++;
     (st.days[s.date] = st.days[s.date] || []).push(s);
   });
   S.money.forEach(function(x){
@@ -2728,7 +2847,8 @@ function statsFor(from, to){
 function summaryLines(st){
   return [
     "Групповых: " + st.g,
-    "Индивидуальных: " + st.ind,
+    "Индивидуальных: " + st.ind
+  ].concat(st.solo ? [soloName() + ": " + st.solo] : []).concat([
     "Детей всего: " + st.kids,
     "",
     "Ваша зарплата: " + money(st.fees),
@@ -2740,7 +2860,7 @@ function summaryLines(st){
     "Получено от начальника: " + money(st.got),
     "",
     "За период начальник должен: " + money(st.fees + st.pool + st.admin - st.cash - st.got)
-  ];
+  ]);
 }
 
 function weekModal(){
@@ -2752,14 +2872,15 @@ function weekModal(){
   var keys = Object.keys(st.days).sort();
   if(!keys.length) lines.push("Тренировок за неделю не было.", "");
   keys.forEach(function(dt){
-    var dd = parseIso(dt), g = 0, ind = 0, kids = 0, pool = 0;
+    var dd = parseIso(dt), g = 0, ind = 0, solo = 0, kids = 0, pool = 0;
     st.days[dt].forEach(function(s){
-      if(s.type === "group") g++; else ind++;
+      if(s.type === "group") g++; else if(s.type === "solo") solo++; else ind++;
       kids += s.present.length; pool += poolOf(s);
     });
     var parts = [];
     if(g) parts.push(g + " " + plural(g,"групповая","групповых","групповых"));
     if(ind) parts.push(ind + " " + plural(ind,"индив.","индив.","индив."));
+    if(solo) parts.push(soloCount(solo));
     lines.push(DAYS_SHORT[dd.getDay()] + " " + dd.getDate() + ": " + parts.join(", ") +
                " · " + kids + " " + plural(kids,"ребёнок","ребёнка","детей") +
                " · бассейну " + money(pool));
@@ -2859,8 +2980,21 @@ el("admClose").onclick = function(){ el("admSheet").classList.remove("on"); };
 
 el("modal").onclick = function(e){ if(e.target === el("modal")) closeModal(); };
 
-["sFeeGroup","sFeeIndiv","sPoolChild","sPoolIndiv","sAdminFee","sPriceSub","sPriceIndiv","sPriceOnce","sPriceTrial"].forEach(function(id){
-  var map = { sFeeGroup:"feeGroup", sFeeIndiv:"feeIndiv", sPoolChild:"poolChild", sPoolIndiv:"poolIndiv",
+el("sSoloName").onchange = function(){
+  S.settings.soloName = el("sSoloName").value.trim();
+  save(); renderDay();
+};
+
+el("sSoloTime").onchange = function(){
+  var raw = el("sSoloTime").value.trim();
+  var t = raw ? normSlot(raw) : "";
+  if(raw && !t){ el("sSoloTime").value = S.settings.soloTime || ""; return; }
+  el("sSoloTime").value = t;
+  S.settings.soloTime = t; save(); renderDay();
+};
+
+["sFeeGroup","sFeeIndiv","sFeeSolo","sPoolChild","sPoolIndiv","sAdminFee","sPriceSub","sPriceIndiv","sPriceOnce","sPriceTrial"].forEach(function(id){
+  var map = { sFeeGroup:"feeGroup", sFeeIndiv:"feeIndiv", sFeeSolo:"feeSolo", sPoolChild:"poolChild", sPoolIndiv:"poolIndiv",
               sAdminFee:"adminFee",
               sPriceSub:"priceSub", sPriceIndiv:"priceIndiv",
               sPriceOnce:"priceOnce", sPriceTrial:"priceTrial" };
