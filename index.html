@@ -272,6 +272,28 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
 .kidrow:last-child{border-bottom:none}
 .kidrow .nm{flex:1;min-width:0;font-size:16px;font-weight:600;overflow-wrap:anywhere}
 .kidrow.arch .nm{color:var(--faint);text-decoration:line-through}
+.kidrow .kid-open{flex:1;min-width:0;display:flex;align-items:center;gap:11px;text-align:left;min-height:56px;padding:0}
+.kidrow .kid-open:active{opacity:.7}
+.kidrow .chev,.visit .chev{color:var(--faint);font-size:20px;line-height:1;flex:none}
+
+/* ---------- карточка ребёнка ---------- */
+.khist-paid{font-size:13.5px;color:var(--muted);padding:0 2px}
+.khist-paid b{color:var(--ink);font-weight:700}
+.khist-m{display:flex;justify-content:space-between;gap:10px}
+.khist-m span:last-child{text-transform:none;letter-spacing:0;font-weight:600}
+.visit{
+  display:flex;align-items:center;gap:12px;width:100%;text-align:left;
+  padding:11px 12px 11px 14px;border-bottom:1px solid var(--line);min-height:54px;
+}
+.visit:last-child{border-bottom:none}
+.visit:active{background:var(--surface-2)}
+.visit .vd{width:88px;flex:none;font-weight:600;font-size:14.5px}
+.visit .vt{flex:1;min-width:0;font-size:14px;color:var(--muted)}
+.visit .vt small{display:block;font-size:12.5px;font-weight:700;margin-top:2px}
+.visit .vt small.cash{color:var(--ochre)}
+.visit .vt small.qr{color:var(--accent-ink)}
+.visit .vt small.note{color:var(--faint);font-weight:600}
+.visit.off .vd,.visit.off .vt .tm{color:var(--faint);text-decoration:line-through}
 .tag{
   font-size:12px;font-weight:700;padding:4px 8px;border-radius:7px;
   background:var(--accent-soft);color:var(--accent-ink);white-space:nowrap;
@@ -697,6 +719,20 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--accent);outline-
   </div>
 </div>
 
+<!-- ===== КАРТОЧКА РЕБЁНКА ===== -->
+<!-- стоит раньше листа посещаемости: тап по визиту открывает тренировку поверх карточки -->
+<div class="sheet" id="kidSheet">
+  <div class="sheet-top">
+    <button class="iconbtn" id="kidClose" type="button" aria-label="Назад">‹</button>
+    <div class="sheet-title">
+      <div class="t1" id="kidTitle">—</div>
+      <div class="t2" id="kidSub">—</div>
+    </div>
+    <button class="iconbtn" id="kidEdit" type="button" aria-label="Изменить">✎</button>
+  </div>
+  <div class="sheet-body"><div class="sheet-inner" id="kidBody"></div></div>
+</div>
+
 <!-- ===== ЛИСТ ПОСЕЩАЕМОСТИ ===== -->
 <div class="sheet" id="attSheet">
   <div class="sheet-top">
@@ -768,6 +804,7 @@ var SPACE_KEY = "bortik.space";
 var DAYS = ["воскресенье","понедельник","вторник","среда","четверг","пятница","суббота"];
 var DAYS_SHORT = ["вс","пн","вт","ср","чт","пт","сб"];
 var MONTHS = ["января","февраля","марта","апреля","мая","июня","июля","августа","сентября","октября","ноября","декабря"];
+var MONTHS_NOM = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
 
 /* ---------- state ---------- */
 var S = null;
@@ -1835,8 +1872,137 @@ function kidRow(k){
   ed.type = "button"; ed.className = "kid-act"; ed.textContent = "✎";
   ed.setAttribute("aria-label","Изменить: " + fullName(k));
   ed.onclick = function(){ kidModal(k); };
-  d.appendChild(nm); d.appendChild(tg); d.appendChild(ed);
+  var open = document.createElement("button");
+  open.type = "button"; open.className = "kid-open";
+  open.setAttribute("aria-label", "История посещений: " + fullName(k));
+  open.onclick = function(){ openKid(k.id); };
+  var chev = document.createElement("span");
+  chev.className = "chev"; chev.textContent = "›";
+  open.appendChild(nm); open.appendChild(tg); open.appendChild(chev);
+  d.appendChild(open); d.appendChild(ed);
   return d;
+}
+
+/* ---------- карточка ребёнка: история посещений ---------- */
+var openKidId = null;
+
+/* Все тренировки, где ребёнок отмечен или за него заплатили. Новые сверху. */
+function kidHistory(id){
+  var rows = [];
+  allSessions().forEach(function(s){
+    if(s.type === "solo") return;
+    var here = s.present.indexOf(id) >= 0;
+    var pay = (s.pay || []).filter(function(p){ return p.kidId === id; })[0] || null;
+    if(!here && !pay) return;
+    rows.push({ s: s, here: here, pay: pay });
+  });
+  rows.sort(function(a, b){
+    if(a.s.date !== b.s.date) return a.s.date < b.s.date ? 1 : -1;
+    return a.s.time < b.s.time ? 1 : a.s.time > b.s.time ? -1 : 0;
+  });
+  return rows;
+}
+function visited(r){ return r.here && !r.s.off; }
+
+function openKid(id){
+  openKidId = id;
+  renderKidSheet();
+  el("kidSheet").classList.add("on");
+  el("kidSheet").querySelector(".sheet-body").scrollTop = 0;
+}
+function closeKid(){
+  el("kidSheet").classList.remove("on");
+  openKidId = null;
+}
+
+function renderKidSheet(){
+  var k = kidById(openKidId);
+  if(!k){ closeKid(); return; }
+  el("kidTitle").textContent = fullName(k);
+  var sl = slotsOf(k).slice().sort();
+  el("kidSub").textContent = (k.arch ? "в архиве · " : "") + (sl.length ? sl.join(" · ") : "без времени");
+
+  var rows = kidHistory(k.id);
+  var came = rows.filter(visited);
+  var now = new Date();
+  var ym = now.getFullYear() + "-" + pad(now.getMonth() + 1);
+  var inMonth = came.filter(function(r){ return r.s.date.slice(0, 7) === ym; }).length;
+  var pays = rows.filter(function(r){ return r.pay; });
+  var paid = pays.reduce(function(t, r){ return t + r.pay.amount; }, 0);
+
+  var body = el("kidBody");
+  body.innerHTML = "";
+
+  var stats = document.createElement("div");
+  stats.className = "tot-strip";
+  [["Всего", came.length], ["Этот месяц", inMonth], ["Последний", came.length ? fmtShort(came[0].s.date) : "—"]]
+    .forEach(function(p){
+      var b = document.createElement("div");
+      b.className = "tot-box";
+      b.innerHTML = '<div class="k"></div><div class="v mono"></div>';
+      b.querySelector(".k").textContent = p[0];
+      b.querySelector(".v").textContent = p[1];
+      stats.appendChild(b);
+    });
+  body.appendChild(stats);
+
+  if(paid){
+    var pl = document.createElement("div");
+    pl.className = "khist-paid";
+    pl.innerHTML = "Оплатил всего: <b>" + money(paid) + "</b> · " + pays.length + " " +
+      plural(pays.length, "оплата", "оплаты", "оплат");
+    body.appendChild(pl);
+  }
+
+  if(!rows.length){
+    var e = document.createElement("div");
+    e.className = "card empty";
+    e.textContent = "Посещений пока нет. Отметьте ребёнка на тренировке — история появится здесь.";
+    body.appendChild(e);
+    return;
+  }
+
+  var curMonth = null, card = null;
+  rows.forEach(function(r){
+    var m = r.s.date.slice(0, 7);
+    if(m !== curMonth){
+      curMonth = m;
+      var n = came.filter(function(x){ return x.s.date.slice(0, 7) === m; }).length;
+      var d0 = parseIso(r.s.date);
+      var lab = document.createElement("div");
+      lab.className = "sect-label khist-m";
+      lab.innerHTML = "<span>" + MONTHS_NOM[d0.getMonth()] + " " + d0.getFullYear() + "</span><span>" +
+        n + " " + plural(n, "посещение", "посещения", "посещений") + "</span>";
+      body.appendChild(lab);
+      card = document.createElement("div");
+      card.className = "card";
+      body.appendChild(card);
+    }
+    card.appendChild(visitRow(r));
+  });
+}
+
+function visitRow(r){
+  var s = r.s, d = parseIso(s.date);
+  var b = document.createElement("button");
+  b.type = "button";
+  b.className = "visit" + (s.off ? " off" : "");
+  var sub = "";
+  if(r.pay){
+    var qr = (r.pay.way || "cash") === "qr";
+    sub = '<small class="' + (qr ? "qr" : "cash") + '">' + money(r.pay.amount) + " · " +
+      PAY_KINDS[r.pay.kind || "other"] + " · " + (qr ? "по QR" : "наличными") + "</small>";
+  }
+  if(s.off) sub += '<small class="note">тренировка отменена</small>';
+  else if(!r.here) sub += '<small class="note">заплатил, но не отмечен</small>';
+  b.innerHTML =
+    '<span class="vd">' + DAYS_SHORT[d.getDay()] + ", " + fmtShort(s.date) + "</span>" +
+    '<span class="vt"><span class="tm"><span class="mono">' + s.time + "</span> · " +
+      escapeHtml(typeLabel(s)) + "</span>" + sub + "</span>" +
+    '<span class="chev">›</span>';
+  b.setAttribute("aria-label", "Открыть тренировку " + fmtShort(s.date) + " " + s.time);
+  b.onclick = function(){ openAtt(s.date, s.time); };
+  return b;
 }
 
 /* ---------- attendance sheet ---------- */
@@ -2919,7 +3085,10 @@ function switchScreen(id){
   window.scrollTo(0,0);
 }
 
-function renderAll(){ renderDay(); renderWeek(); renderMoney(); renderKids(); }
+function renderAll(){
+  renderDay(); renderWeek(); renderMoney(); renderKids();
+  if(openKidId) renderKidSheet();
+}
 
 document.querySelectorAll(".nav button").forEach(function(b){
   b.onclick = function(){ switchScreen(b.getAttribute("data-scr")); };
@@ -2959,7 +3128,12 @@ el("btnExport").onclick = exportModal;
 el("btnBackup").onclick = backupModal;
 el("btnRestore").onclick = restoreModal;
 
-el("attClose").onclick = function(){ el("attSheet").classList.remove("on"); renderDay(); };
+el("attClose").onclick = function(){
+  el("attSheet").classList.remove("on"); renderDay();
+  if(openKidId) renderKidSheet();
+};
+el("kidClose").onclick = function(){ closeKid(); };
+el("kidEdit").onclick = function(){ var k = kidById(openKidId); if(k) kidModal(k); };
 el("attMenu").onclick = sessionMenu;
 el("attAddKid").onclick = function(){ kidModal(null); };
 el("attGuest").onclick = guestModal;
@@ -3009,7 +3183,12 @@ document.addEventListener("keydown", function(e){
   if(e.key !== "Escape") return;
   if(el("modal").classList.contains("on")) return closeModal();
   if(el("admSheet").classList.contains("on")) return el("admSheet").classList.remove("on");
-  if(el("attSheet").classList.contains("on")){ el("attSheet").classList.remove("on"); renderDay(); }
+  if(el("attSheet").classList.contains("on")){
+    el("attSheet").classList.remove("on"); renderDay();
+    if(openKidId) renderKidSheet();
+    return;
+  }
+  if(el("kidSheet").classList.contains("on")) closeKid();
 });
 
 if("serviceWorker" in navigator){
